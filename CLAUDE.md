@@ -29,7 +29,7 @@
 - **Utils**: `lib/` directory
 - **API Routes**: `app/api/` directory
 
-## 🧪 TESTING PROTOCOL
+## 🧪 TESTING PROTOCOL (NOT YET)
 
 - **Unit Tests**: Vitest (src/tests/)
 - **Mocking**: Mock all external dependencies (API calls, database, storage)
