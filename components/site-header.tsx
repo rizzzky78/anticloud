@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 import { SearchCommand } from "@/components/search-command"
+import { NotificationsPopover } from "@/components/notifications-popover"
 
 export function SiteHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -36,19 +37,8 @@ export function SiteHeader() {
           </Button>
 
           <SearchCommand open={isSearchOpen} onOpenChange={setIsSearchOpen} />
-          <Button variant="ghost" size="icon" className="relative" asChild>
-            <Link href="/notifications">
-              <BellIcon className="size-4" />
-              <Badge
-                variant="destructive"
-                className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] leading-none"
-                data-notifications-badge
-              >
-                0
-              </Badge>
-              <span className="sr-only">Notifications</span>
-            </Link>
-          </Button>
+          
+          <NotificationsPopover />
         </div>
       </div>
     </header>

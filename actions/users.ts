@@ -34,3 +34,26 @@ export async function searchUsers(query: string) {
     take: 10,
   });
 }
+
+/**
+ * List all users. Admin or Superadmin only.
+ */
+export async function getUsers() {
+  const session = await getCurrentUser();
+  if (!session || !["SUPERADMIN", "ADMIN"].includes(session.user.role as string)) {
+    throw AppError.forbidden();
+  }
+
+  return db.user.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      username: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+}

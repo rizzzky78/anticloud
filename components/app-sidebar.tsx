@@ -43,7 +43,7 @@ interface AppSidebarUser {
 
 const adminNavItems = [
   { title: "Users & Roles", url: "/admin/users", icon: <UsersIcon /> },
-  { title: "Recycle Bin", url: "/admin/recycle", icon: <Trash2Icon /> },
+  { title: "Recycle Bin", url: "/admin/recycle-bin", icon: <Trash2Icon /> },
   { title: "Jobs", url: "/admin/jobs", icon: <BriefcaseIcon /> },
 ]
 
