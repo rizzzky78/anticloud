@@ -1,6 +1,11 @@
+"use client"
+
+import Link from "next/link"
+import { BellIcon, SearchIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Badge } from "@/components/ui/badge"
 
 export function SiteHeader() {
   return (
@@ -11,7 +16,36 @@ export function SiteHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium">Documents</h1>
+        <div className="flex-1" />
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground"
+            asChild
+          >
+            <Link href="/search">
+              <SearchIcon className="size-4" />
+              <span className="hidden sm:inline text-sm">Search</span>
+              <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" className="relative" asChild>
+            <Link href="/notifications">
+              <BellIcon className="size-4" />
+              <Badge
+                variant="destructive"
+                className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] leading-none"
+                data-notifications-badge
+              >
+                0
+              </Badge>
+              <span className="sr-only">Notifications</span>
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   )

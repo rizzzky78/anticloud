@@ -41,8 +41,8 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 
 Plan: [`plan/ui/`](plan/ui/README.md). `⛔` = blocked on backend Phase 10.
 
-- [ ] **UI0 Shell** — 00.1 layout · 00.2 sidebar · 00.3 header · 00.4 providers · 00.5 primitives · 00.6 access helper
-- [ ] **UI1 Auth** — 01.1 sign-in · 01.2 sign-up · 01.3 layout · 01.4 routing
+- [x] **UI0 Shell** — 00.1 layout · 00.2 sidebar · 00.3 header · 00.4 providers · 00.5 primitives · 00.6 access helper
+- [x] **UI1 Auth** — 01.1 sign-in · 01.2 sign-up · 01.3 layout · 01.4 routing
 - [ ] **UI2 Browser** — 02.1 page · 02.2 row/bucket · 02.3 actions · 02.4 states · 02.5 paging/folders
 - [ ] **UI3 Upload** — 03.1 dialog · 03.2 progress · 03.3 queue · 03.4 replace · 03.5 folder target
 - [ ] **UI4 Detail** — 04.1 page · 04.2 preview/download · 04.3 edits · 04.4 config panel · 04.5 delete/recover
