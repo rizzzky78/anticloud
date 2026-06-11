@@ -33,7 +33,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 - [x] 9.1 job infra · 9.2 expiry cron · 9.3 bulk sync · 9.4 bulk async · 9.5 compression
 
 ## P10 — Audit & observability
-- [ ] 10.1 audit model · 10.2 backfill · 10.3 query · 10.4 metrics · 10.5 counters
+- [x] 10.1 audit model · 10.2 backfill · 10.3 query · 10.4 metrics · 10.5 counters
 
 ---
 
@@ -50,6 +50,6 @@ Plan: [`plan/ui/`](plan/ui/README.md). `⛔` = blocked on backend Phase 10.
 - [x] **UI6 Sharing** — 06.1 share dialog · 06.2 access summary · 06.3 gated entry
 - [x] **UI7 Search** — 07.1 palette · 07.2 results page · 07.3 filters · 07.4 states
 - [x] **UI8 Notifications** — 08.1 badge · 08.2 popover · 08.3 page
-- [x] **UI9 Admin** — 09.1 guard · 09.2 roles · 09.3 recycle bin · 09.4 audit ⛔ · 09.5 jobs (metrics ⛔)
+- [x] **UI9 Admin** — 09.1 guard · 09.2 roles · 09.3 recycle bin · 09.4 audit · 09.5 jobs (metrics)
 - [ ] **UI10 Settings** — 10.1 shell · 10.2 profile · 10.3 appearance · 10.4 account/sign-out
 - [ ] **UI11 Bulk** — 11.0 job-status read · 11.1 select · 11.2 bulk dl · 11.3 polling · 11.4 compress · 11.5 jobs drawer

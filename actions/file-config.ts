@@ -9,6 +9,7 @@ import { assertWriteAccess, assertNotReadOnly } from "@/lib/file-access";
 import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
 import { env } from "@/lib/env";
+import { recordAudit } from "@/lib/audit";
 
 // Superadmin recovery window for soft-deleted files (phase-09 hard-deletes after this).
 const GRACE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -42,7 +43,12 @@ export async function setTTL(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.set_ttl", fileId)
+  await recordAudit({
+    action: "file.set_ttl",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { expiresAt },
+  });
   return { fileId };
 }
 
@@ -70,7 +76,11 @@ export async function softDeleteFile(payload: unknown) {
   await bustFileMeta(fileId);
   // Evict all permission decisions — the file is now inaccessible.
   await invalidatePermCache(null, fileId);
-  // Phase-10 stub: audit("file.soft_delete", fileId)
+  await recordAudit({
+    action: "file.soft_delete",
+    targetType: "file",
+    targetId: fileId,
+  });
   return { fileId };
 }
 
@@ -106,7 +116,11 @@ export async function recoverFile(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.recover", fileId)
+  await recordAudit({
+    action: "file.recover",
+    targetType: "file",
+    targetId: fileId,
+  });
   return { fileId };
 }
 
@@ -133,7 +147,11 @@ export async function generatePermanentToken(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.generate_token", fileId)
+  await recordAudit({
+    action: "file.generate_token",
+    targetType: "file",
+    targetId: fileId,
+  });
 
   const url = `${env.APP_URL}/api/files/p/${token}`;
   return { fileId, token, url };
@@ -156,7 +174,11 @@ export async function revokePermanentToken(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.revoke_token", fileId)
+  await recordAudit({
+    action: "file.revoke_token",
+    targetType: "file",
+    targetId: fileId,
+  });
   return { fileId };
 }
 
@@ -187,7 +209,12 @@ export async function setReadOnly(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.set_readonly", fileId)
+  await recordAudit({
+    action: "file.set_readonly",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { isReadOnly },
+  });
   return { fileId };
 }
 
@@ -221,6 +248,11 @@ export async function setMentionRestricted(payload: unknown) {
   await bustFileMeta(fileId);
   // Mention-restriction change affects all permission decisions for this file.
   await invalidatePermCache(null, fileId);
-  // Phase-10 stub: audit("file.set_mention_restricted", fileId)
+  await recordAudit({
+    action: "file.set_mention_restricted",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { isMentionRestricted },
+  });
   return { fileId };
 }

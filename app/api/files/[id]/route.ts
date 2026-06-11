@@ -78,7 +78,14 @@ export async function GET(
     const minioStream = await getObjectStream(file.objectKey);
     const webStream = Readable.toWeb(minioStream) as ReadableStream;
 
-    // Phase-10 stub: record download audit entry here once audit module ships.
+    const { recordAudit } = await import("@/lib/audit");
+    await recordAudit({
+      actorId: session?.user?.id || null,
+      action: "file.download",
+      targetType: "file",
+      targetId: file.id,
+      metadata: { displayName: file.displayName },
+    });
 
     return new Response(webStream, {
       status: 200,

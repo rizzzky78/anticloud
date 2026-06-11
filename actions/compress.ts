@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { assertWriteAccess } from "@/lib/file-access";
 import { enqueueJob } from "@/lib/jobs";
+import { recordAudit } from "@/lib/audit";
 
 const compressSchema = z.object({
   fileId: z.string().min(1),
@@ -23,6 +24,13 @@ export async function compress(payload: unknown) {
     type: "COMPRESSION",
     payload: { fileId },
     maxAttempts: 3,
+  });
+
+  await recordAudit({
+    action: "file.compress",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { jobId: job.id },
   });
 
   return { jobId: job.id };

@@ -62,6 +62,8 @@ export async function failJob(jobId: string, errorMsg: string): Promise<void> {
   const job = await db.job.findUnique({ where: { id: jobId } });
   if (!job) return;
 
+  await redis.incr("metrics:job_failures_total").catch(() => {});
+
   const newAttempts = job.attempts + 1;
   const isDeadLetter = newAttempts >= job.maxAttempts;
 

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
 import { JobsClient } from "./jobs-client";
 import { BriefcaseIcon } from "lucide-react";
+import { redis, redisKey, NS } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,13 @@ export default async function AdminJobsPage() {
   if (!currentUser || currentUser.role !== "SUPERADMIN") {
     notFound();
   }
+
+  // Fetch telemetry metrics
+  const queueDepth = await redis.llen(redisKey(NS.job, "queue")).catch(() => 0);
+  const cacheHits = parseInt((await redis.get("metrics:cache_hits_total")) || "0", 10);
+  const cacheMisses = parseInt((await redis.get("metrics:cache_misses_total")) || "0", 10);
+  const totalCacheLookups = cacheHits + cacheMisses;
+  const cacheHitRate = totalCacheLookups > 0 ? (cacheHits / totalCacheLookups) * 100 : 0;
 
   // Fetch recent background jobs
   const jobs = await db.job.findMany({
@@ -50,7 +58,11 @@ export default async function AdminJobsPage() {
         </p>
       </div>
 
-      <JobsClient initialJobs={serializedJobs} />
+      <JobsClient
+        initialJobs={serializedJobs}
+        queueDepth={queueDepth}
+        cacheHitRate={cacheHitRate}
+      />
     </div>
   );
 }

@@ -40,7 +40,14 @@ export async function GET(
     // serving even if the token itself has not changed.
     if (file.visibility !== "PUBLIC") return new Response(null, { status: 404 });
 
-    // Phase-10 stub: audit("file.permanent_url_serve", file.id)
+    const { recordAudit } = await import("@/lib/audit");
+    await recordAudit({
+      actorId: null,
+      action: "file.permanent_url_serve",
+      targetType: "file",
+      targetId: file.id,
+      metadata: { displayName: file.displayName },
+    });
 
     const minioStream = await getObjectStream(file.objectKey);
     const webStream = Readable.toWeb(minioStream) as ReadableStream;

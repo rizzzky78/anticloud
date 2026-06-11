@@ -6,6 +6,7 @@ import { AppError } from "@/lib/result";
 import { Role } from "@prisma/client";
 import { z } from "zod";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 const setSystemRoleSchema = z.object({
   userId: z.string(),
@@ -36,7 +37,12 @@ export async function setSystemRole(payload: z.infer<typeof setSystemRoleSchema>
 
   await invalidatePermCache(userId, null);
   
-  // TODO: Phase 10 Audit Log
+  await recordAudit({
+    action: "role.set_system",
+    targetType: "user",
+    targetId: userId,
+    metadata: { oldRole: targetUser?.role, newRole },
+  });
   return { success: true };
 }
 
@@ -63,7 +69,12 @@ export async function grantFileRole(payload: z.infer<typeof grantFileRoleSchema>
 
   await invalidatePermCache(targetUserId, fileId);
 
-  // TODO: Phase 10 Audit Log
+  await recordAudit({
+    action: "role.grant_file",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { targetUserId, role },
+  });
   return { success: true };
 }
 
@@ -86,7 +97,12 @@ export async function revokeFileRole(payload: z.infer<typeof revokeFileRoleSchem
 
   await invalidatePermCache(targetUserId, fileId);
 
-  // TODO: Phase 10 Audit Log
+  await recordAudit({
+    action: "role.revoke_file",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { targetUserId },
+  });
   return { success: true };
 }
 

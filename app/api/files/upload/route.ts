@@ -121,6 +121,15 @@ export async function POST(request: NextRequest) {
             visibility,
           },
         });
+
+        const { recordAudit } = await import("@/lib/audit");
+        await recordAudit({
+          actorId: session.user.id,
+          action: "file.upload",
+          targetType: "file",
+          targetId: id,
+          metadata: { displayName, mimeType, size: size.toString(), folderPath, visibility },
+        });
       },
     );
 

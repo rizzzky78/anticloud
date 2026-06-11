@@ -114,6 +114,15 @@ export async function PUT(
       redisKey(NS.perm, session.user.id, id),
     );
 
+    const { recordAudit } = await import("@/lib/audit");
+    await recordAudit({
+      actorId: session.user.id,
+      action: "file.replace",
+      targetType: "file",
+      targetId: id,
+      metadata: { mimeType: newMimeType, size: size.toString() },
+    });
+
     return Response.json({ id });
   } catch (err) {
     return Response.json(toApiError(err), { status: statusFor(err) });

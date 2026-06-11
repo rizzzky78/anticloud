@@ -53,9 +53,15 @@ interface JobItem {
 
 interface JobsClientProps {
   initialJobs: JobItem[];
+  queueDepth: number;
+  cacheHitRate: number;
 }
 
-export function JobsClient({ initialJobs }: JobsClientProps) {
+export function JobsClient({
+  initialJobs,
+  queueDepth,
+  cacheHitRate,
+}: JobsClientProps) {
   const [jobs, setJobs] = useState<JobItem[]>(initialJobs);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState<JobItem | null>(null);
@@ -126,16 +132,16 @@ export function JobsClient({ initialJobs }: JobsClientProps) {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border border-border/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Metrics summary</CardTitle>
-            <Layers className="size-4 text-muted-foreground/60" />
+            <CardTitle className="text-sm font-medium">System Telemetry</CardTitle>
+            <Layers className="size-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold flex items-baseline gap-1.5">
-              <span>⛔ Blocked</span>
+            <div className="text-lg font-bold space-y-1">
+              <div>Queue Depth: <span className="font-mono text-primary">{queueDepth}</span> jobs</div>
+              <div className="text-sm text-muted-foreground font-normal">
+                Cache Hit Rate: <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{cacheHitRate.toFixed(1)}%</span>
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground/80 mt-1 bg-amber-500/10 text-amber-600 dark:text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded w-fit">
-              Locked on Phase 10 /api/metrics
-            </p>
           </CardContent>
         </Card>
 

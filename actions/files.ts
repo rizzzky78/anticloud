@@ -8,6 +8,7 @@ import { AppError } from "@/lib/result";
 import { assertWriteAccess, assertNotReadOnly } from "@/lib/file-access";
 import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -46,7 +47,12 @@ export async function renameFile(payload: unknown) {
   await updateSearchVector(fileId);
   await invalidateUserSearchCache(session.user.id);
   
-  // Phase-10 stub: audit("file.rename", fileId)
+  await recordAudit({
+    action: "file.rename",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { oldName: file.displayName, newName: displayName },
+  });
   return { fileId };
 }
 
@@ -80,7 +86,12 @@ export async function moveFile(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
-  // Phase-10 stub: audit("file.move", fileId)
+  await recordAudit({
+    action: "file.move",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { oldPath: file.folderPath, newPath: folderPath },
+  });
   return { fileId };
 }
 
@@ -121,6 +132,11 @@ export async function setVisibility(payload: unknown) {
   // Visibility change invalidates ALL cached permission decisions for this file.
   await invalidatePermCache(null, fileId);
 
-  // Phase-10 stub: audit("file.visibility", fileId)
+  await recordAudit({
+    action: "file.visibility",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { visibility, guestAccess: newGuestAccess },
+  });
   return { fileId };
 }

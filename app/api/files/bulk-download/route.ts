@@ -27,6 +27,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No files selected" }, { status: 400 });
     }
 
+    const { recordAudit } = await import("@/lib/audit");
+    await recordAudit({
+      actorId: session.user.id,
+      action: "file.bulk_download",
+      targetType: "bulk",
+      targetId: null,
+      metadata: { fileIdsCount: fileIds.length, async: fileIds.length > MAX_SYNC_FILES },
+    });
+
     if (fileIds.length > MAX_SYNC_FILES) {
       // Phase 09 §9.4: Async bulk download
       const job = await enqueueJob({

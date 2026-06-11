@@ -9,7 +9,11 @@ import { redis } from "@/lib/redis";
 /** Read and parse a JSON value. Returns `null` on miss or unparseable data. */
 export async function getJSON<T>(key: string): Promise<T | null> {
   const raw = await redis.get(key);
-  if (raw === null) return null;
+  if (raw === null) {
+    await redis.incr("metrics:cache_misses_total").catch(() => {});
+    return null;
+  }
+  await redis.incr("metrics:cache_hits_total").catch(() => {});
   try {
     return JSON.parse(raw) as T;
   } catch {
