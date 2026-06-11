@@ -14,7 +14,7 @@
 
 - **Framework**: Next.js (App Router)
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS + shadcn/ui components
+- **Styling**: Tailwind CSS + shadcn/ui components, never modify, use existing color scheme UIs
 - **ORM**: Prisma (for PostgreSQL)
 - **Auth**: Better-Auth
 - **Storage**: MinIO (S3-compatible)
