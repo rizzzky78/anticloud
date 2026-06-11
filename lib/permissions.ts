@@ -81,10 +81,17 @@ export async function getCachedAccess(
   // Resolve from DB
   const file = await db.file.findUnique({
     where: { id: fileId },
-    select: { visibility: true, guestAccess: true, isMentionRestricted: true }
+    select: { ownerId: true, visibility: true, guestAccess: true, isMentionRestricted: true }
   });
 
   if (!file) throw AppError.notFound("File not found");
+
+  // Owner bypass: owners always have full access to their files
+  if (user && file.ownerId === user.id) {
+    const level = user.role === "SUPERADMIN" ? "SUPERADMIN" : "ADMIN";
+    await redis.set(cacheKey, level, "EX", PERM_TTL_SECONDS);
+    return level;
+  }
 
   let explicitGrantLevel: Role | null = null;
   let isMentioned = false;

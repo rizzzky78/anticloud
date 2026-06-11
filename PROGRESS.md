@@ -45,8 +45,8 @@ Plan: [`plan/ui/`](plan/ui/README.md). `⛔` = blocked on backend Phase 10.
 - [x] **UI1 Auth** — 01.1 sign-in · 01.2 sign-up · 01.3 layout · 01.4 routing
 - [ ] **UI2 Browser** — 02.1 page · 02.2 row/bucket · 02.3 actions · 02.4 states · 02.5 paging/folders
 - [ ] **UI3 Upload** — 03.1 dialog · 03.2 progress · 03.3 queue · 03.4 replace · 03.5 folder target
-- [ ] **UI4 Detail** — 04.1 page · 04.2 preview/download · 04.3 edits · 04.4 config panel · 04.5 delete/recover
-- [ ] **UI5 Collab** — 05.1 tags · 05.2 mentions · 05.3 notes · 05.4 history
+- [x] **UI4 Detail** — 04.1 page · 04.2 preview/download · 04.3 edits · 04.4 config panel · 04.5 delete/recover
+- [x] **UI5 Collab** — 05.1 tags · 05.2 mentions · 05.3 notes · 05.4 history
 - [ ] **UI6 Sharing** — 06.1 share dialog · 06.2 access summary · 06.3 gated entry
 - [ ] **UI7 Search** — 07.1 palette · 07.2 results page · 07.3 filters · 07.4 states
 - [ ] **UI8 Notifications** — 08.1 badge · 08.2 popover · 08.3 page
