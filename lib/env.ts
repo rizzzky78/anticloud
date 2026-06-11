@@ -41,6 +41,7 @@ const envSchema = z.object({
 
   // Application.
   APP_URL: z.url({ message: "must be a valid URL" }),
+  CRON_SECRET: z.string().default("development_secret_change_me"),
 });
 
 /** Inferred, fully-typed shape of the validated environment. */

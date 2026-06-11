@@ -157,3 +157,39 @@ export async function invalidatePermCache(userId: string | null, fileId: string 
     stream.on("error", reject);
   });
 }
+
+/**
+ * Get all files a user is permitted to see.
+ * This is primarily used to scope search and bulk downloads.
+ */
+export async function getPermittedFiles(userId: string): Promise<{ id: string }[]> {
+  const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+  if (!user) return [];
+
+  if (user.role === "SUPERADMIN") {
+    return db.file.findMany({ select: { id: true } });
+  } else if (user.role === "ADMIN") {
+    return db.file.findMany({
+      where: {
+        OR: [
+          { ownerId: user.id },
+          { visibility: "PUBLIC" },
+          { permissions: { some: { userId: user.id } } },
+          { ownerId: null, visibility: "PRIVATE" }
+        ]
+      },
+      select: { id: true }
+    });
+  } else {
+    return db.file.findMany({
+      where: {
+        OR: [
+          { ownerId: user.id },
+          { visibility: "PUBLIC" },
+          { permissions: { some: { userId: user.id } } }
+        ]
+      },
+      select: { id: true }
+    });
+  }
+}

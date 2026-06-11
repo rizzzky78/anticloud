@@ -18,7 +18,11 @@ async function resolveReadAccess(
   allowed: boolean;
 }> {
   const file = await db.file.findFirst({
-    where: { id: fileId, deletedAt: null },
+    where: {
+      id: fileId,
+      deletedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
   });
 
   if (!file) return { file: null, allowed: false };
@@ -39,6 +43,11 @@ async function resolveReadAccess(
   if (grant) return { file, allowed: true };
 
   if (file.visibility === "PUBLIC") return { file, allowed: true };
+
+  // Unowned private files: ADMINs can access (phase-04 §4.5).
+  if (file.ownerId === null && file.visibility === "PRIVATE") {
+    return { file, allowed: role === "ADMIN" };
+  }
 
   return { file, allowed: false };
 }

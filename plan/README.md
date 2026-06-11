@@ -23,6 +23,10 @@ This plan is split into **phases**. Each phase is a self-contained file with ord
 | 9 | Jobs · Bulk Download · Compression | [phase-09-jobs-bulk-compression.md](phase-09-jobs-bulk-compression.md) | 3, 5 | 10, 11, 14 |
 | 10 | Audit & Observability | [phase-10-audit-observability.md](phase-10-audit-observability.md) | 1 | 15 |
 
+## UI Plan
+
+Frontend is planned separately in [`plan/ui/`](ui/README.md) — phased screens (`ui-00`…`ui-11`) bound to the handlers above, built only from existing shadcn/ui components.
+
 ## Architecture Pillars (hold across all phases)
 
 1. **Identity & access** — Better-Auth at the gate; Redis answers session/permission questions, not the DB.
