@@ -1,0 +1,364 @@
+// Anticloud — full data model.
+//
+// Consolidated schema for all phases. Sections are ordered by the plan in
+// `plan/`. The Postgres connection is driven at runtime by the
+// `@prisma/adapter-pg` driver adapter (see `lib/db.ts`); the `url` below is used
+// only by the Prisma CLI (migrate/introspect/studio). `.env` is loaded for the
+// CLI by `prisma.config.ts`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// System- and file-level access tiers. Resolution order lives in
+/// `lib/permissions.ts` (see plan/phase-02-rbac.md).
+enum Role {
+  SUPERADMIN
+  ADMIN
+  VIEWER
+  GUEST
+}
+
+/// File visibility. `PRIVATE` → owner + explicit grants only; `PUBLIC` →
+/// any authenticated user (+ guests when `guestAccess` is true).
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+/// Background job categories (plan/phase-09).
+enum JobType {
+  TTL_EXPIRY
+  BULK_ARCHIVE
+  COMPRESSION
+}
+
+/// Background job lifecycle. `DEAD_LETTER` = retries exhausted, awaiting
+/// superadmin review.
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  DEAD_LETTER
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Authentication (Better-Auth: username + password). plan/phase-01-auth.md
+// Field names/shapes mirror Better-Auth's generated schema so the adapter works
+// without custom mapping. `role` is our RBAC extension.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String  @id @default(cuid())
+  name          String
+  email         String  @unique
+  emailVerified Boolean @default(false)
+  image         String?
+
+  // Username plugin.
+  username        String? @unique
+  displayUsername String?
+
+  // RBAC system role (plan/phase-02). File-level grants live in FilePermission.
+  role Role @default(VIEWER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations.
+  sessions        Session[]
+  accounts        Account[]
+  ownedFiles      File[]           @relation("FileOwner")
+  permissions     FilePermission[] @relation("PermissionUser")
+  grantsGiven     FilePermission[] @relation("PermissionGrantedBy")
+  mentions        FileMention[]    @relation("MentionTarget")
+  mentionsCreated FileMention[]    @relation("MentionAuthor")
+  notes           FileNote[]       @relation("NoteAuthor")
+  notifications   Notification[]
+  auditLogs       AuditLog[]       @relation("AuditActor")
+
+  @@index([role])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Files. plan/phase-03, 04, 05.
+// MinIO owns the binary; this row owns all relational truth. `objectKey` is the
+// internal MinIO key (UUID-derived) and is never exposed as the user-facing name.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model File {
+  id String @id @default(uuid())
+
+  // Ownership. Null = unowned (uploaded without user context / system resource).
+  // On owner deletion the FK is set null → file is preserved as unowned
+  // (plan/phase-04 §4.5), not cascaded away.
+  ownerId String?
+  owner   User?   @relation("FileOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  // User-visible metadata (pure DB; editing these never touches MinIO).
+  displayName String
+  folderPath  String @default("/")
+
+  // Binary pointer + descriptors.
+  objectKey String  @unique
+  mimeType  String
+  size      BigInt
+
+  // Visibility / access configuration.
+  visibility          Visibility @default(PRIVATE)
+  guestAccess         Boolean    @default(false)
+  isReadOnly          Boolean    @default(false)
+  isMentionRestricted Boolean    @default(false)
+
+  // Permanent presigned URL token (plan/phase-05 §5.2). Validated against the
+  // file's current permission/visibility state on each access — a token, not a
+  // capability.
+  permanentUrlToken String? @unique
+
+  // Lifecycle (plan/phase-05). Soft-delete first (`deletedAt`), hard-delete
+  // after the grace window via the expiry job (plan/phase-09 §9.2).
+  expiresAt DateTime?
+  deletedAt DateTime?
+
+  // Derived versions, e.g. compression output (plan/phase-09 §9.5).
+  derivedFromId String?
+  derivedFrom   File?   @relation("FileDerivation", fields: [derivedFromId], references: [id], onDelete: SetNull)
+  derivatives   File[]  @relation("FileDerivation")
+
+  // Full-text search vector (plan/phase-08). The generated-column expression
+  // and GIN index are created in a raw SQL migration; Prisma only tracks the
+  // column so the client stays in sync.
+  searchVector Unsupported("tsvector")?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations.
+  permissions   FilePermission[]
+  tags          FileTag[]
+  mentions      FileMention[]
+  notes         FileNote[]
+  notifications Notification[]
+
+  @@index([ownerId])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([visibility])
+  @@index([derivedFromId])
+  @@index([searchVector], type: Gin)
+  @@map("file")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RBAC file-level grants. plan/phase-02-rbac.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FilePermission {
+  id     String @id @default(cuid())
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("PermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  role   Role
+
+  grantedById String?
+  grantedBy   User?   @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fileId, userId])
+  @@index([userId])
+  @@map("file_permission")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tags + mentions + notifications. plan/phase-06-tags-mentions.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id        String    @id @default(cuid())
+  value     String    @unique
+  createdAt DateTime  @default(now())
+  files     FileTag[]
+
+  @@map("tag")
+}
+
+model FileTag {
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([fileId, tagId])
+  @@index([tagId])
+  @@map("file_tag")
+}
+
+/// A user mentioned in a file's metadata. Doubles as the access grant when the
+/// file is mention-restricted (plan/phase-05 §5.4).
+model FileMention {
+  id     String @id @default(cuid())
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  mentionedUserId String
+  mentionedUser   User   @relation("MentionTarget", fields: [mentionedUserId], references: [id], onDelete: Cascade)
+
+  addedById String?
+  addedBy   User?   @relation("MentionAuthor", fields: [addedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fileId, mentionedUserId])
+  @@index([mentionedUserId])
+  @@map("file_mention")
+}
+
+model Notification {
+  id     String  @id @default(cuid())
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId String?
+  file   File?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  type    String
+  message String
+  readAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@map("notification")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// File notes (versioned). plan/phase-07-notes.md.
+// Each edit inserts a new row; current note = highest `version` for the file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model FileNote {
+  id      String @id @default(cuid())
+  fileId  String
+  file    File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  version Int
+  body    String
+
+  authorId String?
+  author   User?   @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fileId, version])
+  @@index([fileId, version(sort: Desc)])
+  @@map("file_note")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Background jobs. plan/phase-09-jobs-bulk-compression.md.
+// Redis is the live queue; this table is the durable record + DLQ flag.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Job {
+  id          String    @id @default(cuid())
+  type        JobType
+  status      JobStatus @default(PENDING)
+  payload     Json
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  result      Json?
+  error       String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([type])
+  @@map("job")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Audit log (append-only). plan/phase-10-audit-observability.md.
+// No update/delete path is exposed through the application API.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id      String  @id @default(cuid())
+  actorId String?
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  action     String
+  targetType String?
+  targetId   String?
+  ip         String?
+  metadata   Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetType, targetId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
+}

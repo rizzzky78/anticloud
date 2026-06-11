@@ -26,3 +26,12 @@
 - **Server Actions**: `actions/` directory
 - **Utils**: `lib/` directory
 - **API Routes**: `app/api/` directory
+
+## 🗺️ IMPLEMENTATION PLAN
+
+- Plan lives in [`plan/`](plan/README.md) — one file per phase, worked **in order** (deps in the index table).
+- Each numbered step = one agent action with its own acceptance criteria. Do only the step's deliverables.
+- Track work in [`PROGRESS.md`](PROGRESS.md): tick a step when its acceptance criteria pass. Don't start a phase whose deps are unchecked.
+- `lib/env.ts` is the only reader of `process.env`. `lib/storage.ts` is the only module that talks to MinIO.
+- Next.js 16 differs from training data — read `node_modules/next/dist/docs/` for the relevant guide before writing code.
+- No need do type check, lint or build after changes
