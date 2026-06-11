@@ -2,11 +2,13 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams, useRouter } from "next/navigation"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { Button } from "@/components/ui/button"
+import { UploadDialog } from "@/components/upload-dialog"
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +30,7 @@ import {
   BriefcaseIcon,
   Settings2Icon,
   CloudIcon,
+  UploadIcon,
 } from "lucide-react"
 
 interface AppSidebarUser {
@@ -35,7 +38,7 @@ interface AppSidebarUser {
   name: string
   email: string
   image?: string | null
-  role?: string
+  role?: string | null
 }
 
 const adminNavItems = [
@@ -47,9 +50,21 @@ const adminNavItems = [
 export function AppSidebar({
   user,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { user: AppSidebarUser }) {
+}: React.ComponentProps<typeof Sidebar> & { user?: AppSidebarUser }) {
   const pathname = usePathname()
-  const isAdmin = user.role === "ADMIN" || user.role === "SUPERADMIN"
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [isUploadOpen, setIsUploadOpen] = React.useState(false)
+
+  const currentUser = user || {
+    name: "Mock User",
+    email: "mock@example.com",
+    role: "VIEWER",
+  }
+
+  const isAdmin = currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN"
+
+  const currentFolderPath = searchParams.get("folderPath") ?? "/"
 
   const navMain = [
     { title: "Files", url: "/files", icon: <FolderIcon /> },
@@ -58,74 +73,96 @@ export function AppSidebar({
   ]
 
   return (
-    <Sidebar collapsible="offcanvas" {...props}>
-      <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+    <>
+      <Sidebar collapsible="offcanvas" {...props}>
+        <SidebarHeader className="gap-4">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                className="data-[slot=sidebar-menu-button]:p-1.5!"
+              >
+                <Link href="/files">
+                  <CloudIcon className="size-5!" />
+                  <span className="text-base font-semibold">Anticloud</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+
+          <div className="px-2">
+            <Button
+              onClick={() => setIsUploadOpen(true)}
+              className="w-full gap-2 justify-center shadow-sm"
+              size="sm"
             >
-              <Link href="/files">
-                <CloudIcon className="size-5!" />
-                <span className="text-base font-semibold">Anticloud</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarHeader>
+              <UploadIcon className="size-4" />
+              <span>Upload File</span>
+            </Button>
+          </div>
+        </SidebarHeader>
 
-      <SidebarContent>
-        <NavMain items={navMain} />
+        <SidebarContent>
+          <NavMain items={navMain} />
 
-        {isAdmin && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {adminNavItems.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={item.title}
-                      isActive={
-                        pathname === item.url ||
-                        pathname.startsWith(item.url + "/")
-                      }
-                    >
-                      <Link href={item.url}>
-                        {item.icon}
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+          {isAdmin && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Admin</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminNavItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.title}
+                        isActive={
+                          pathname === item.url ||
+                          pathname.startsWith(item.url + "/")
+                        }
+                      >
+                        <Link href={item.url}>
+                          {item.icon}
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
 
-        <NavSecondary
-          items={[
-            {
-              title: "Settings",
-              url: "/settings",
-              icon: <Settings2Icon />,
-            },
-          ]}
-          className="mt-auto"
-        />
-      </SidebarContent>
+          <NavSecondary
+            items={[
+              {
+                title: "Settings",
+                url: "/settings",
+                icon: <Settings2Icon />,
+              },
+            ]}
+            className="mt-auto"
+          />
+        </SidebarContent>
 
-      <SidebarFooter>
-        <NavUser
-          user={{
-            name: user.name,
-            email: user.email,
-            avatar: user.image ?? "",
-          }}
-        />
-      </SidebarFooter>
-    </Sidebar>
+        <SidebarFooter>
+          <NavUser
+            user={{
+              name: currentUser.name,
+              email: currentUser.email,
+              avatar: currentUser.image ?? "",
+            }}
+          />
+        </SidebarFooter>
+      </Sidebar>
+      <UploadDialog
+        isOpen={isUploadOpen}
+        onOpenChange={setIsUploadOpen}
+        currentFolderPath={currentFolderPath}
+        onSuccess={() => {
+          router.refresh()
+        }}
+      />
+    </>
   )
 }
+

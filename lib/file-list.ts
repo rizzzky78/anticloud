@@ -21,6 +21,7 @@ export interface FileListEntry {
   folderPath: string;
   guestAccess: boolean;
   isReadOnly: boolean;
+  isMentionRestricted: boolean;
   createdAt: string;
   updatedAt: string;
   bucket: BucketKey;
@@ -54,6 +55,7 @@ interface RawFileRow {
   folder_path: string;
   guest_access: boolean;
   is_read_only: boolean;
+  is_mention_restricted: boolean;
   created_at: Date;
   updated_at: Date;
   bucket: string;
@@ -109,6 +111,7 @@ const SELECT_COLS = Prisma.sql`
   f.folder_path,
   f.guest_access,
   f.is_read_only,
+  f.is_mention_restricted,
   f.created_at,
   f.updated_at,
   ${BUCKET_EXPR} AS bucket
@@ -133,6 +136,7 @@ function groupRows(rows: RawFileRow[]): FileBucket[] {
       folderPath: r.folder_path,
       guestAccess: r.guest_access,
       isReadOnly: r.is_read_only,
+      isMentionRestricted: r.is_mention_restricted,
       createdAt: r.created_at.toISOString(),
       updatedAt: r.updated_at.toISOString(),
       bucket: r.bucket,
@@ -242,3 +246,91 @@ export async function listFilesGrouped(
   `;
   return groupRows(rows);
 }
+
+export function getImmediateSubfolders(currentPath: string, allPaths: string[]): string[] {
+  const normalizedCurrent = currentPath.endsWith("/") ? currentPath : currentPath + "/";
+  const subfolders = new Set<string>();
+
+  for (const path of allPaths) {
+    if (path === currentPath) continue;
+    if (path.startsWith(normalizedCurrent)) {
+      const relative = path.slice(normalizedCurrent.length);
+      const firstSegment = relative.split("/")[0];
+      if (firstSegment) {
+        subfolders.add(normalizedCurrent + firstSegment);
+      }
+    }
+  }
+
+  return Array.from(subfolders);
+}
+
+export async function listUserFolderPaths(
+  user: { id: string; role: string } | null,
+): Promise<string[]> {
+  if (!user) {
+    const rows = await db.$queryRaw<{ folder_path: string }[]>`
+      SELECT DISTINCT f.folder_path
+      FROM "file" f
+      WHERE f.deleted_at IS NULL
+        ${EXPIRY_FILTER}
+        AND f.visibility = 'PUBLIC'
+        AND f.guest_access = true
+    `;
+    return rows.map((r) => r.folder_path);
+  }
+
+  if (user.role === "SUPERADMIN") {
+    const rows = await db.$queryRaw<{ folder_path: string }[]>`
+      SELECT DISTINCT f.folder_path
+      FROM "file" f
+      WHERE f.deleted_at IS NULL
+        ${EXPIRY_FILTER}
+    `;
+    return rows.map((r) => r.folder_path);
+  }
+
+  if (user.role === "ADMIN") {
+    const rows = await db.$queryRaw<{ folder_path: string }[]>`
+      SELECT DISTINCT f.folder_path
+      FROM "file" f
+      WHERE f.deleted_at IS NULL
+        ${EXPIRY_FILTER}
+        AND (
+          f.owner_id = ${user.id}
+          OR f.visibility = 'PUBLIC'
+          OR EXISTS (
+            SELECT 1 FROM file_permission fp
+            WHERE fp.file_id = f.id AND fp.user_id = ${user.id}
+          )
+          OR (f.owner_id IS NULL AND f.visibility = 'PRIVATE')
+        )
+    `;
+    return rows.map((r) => r.folder_path);
+  }
+
+  const rows = await db.$queryRaw<{ folder_path: string }[]>`
+    SELECT DISTINCT f.folder_path
+    FROM "file" f
+    WHERE f.deleted_at IS NULL
+      ${EXPIRY_FILTER}
+      AND (
+        f.owner_id = ${user.id}
+        OR f.visibility = 'PUBLIC'
+        OR EXISTS (
+          SELECT 1 FROM file_permission fp
+          WHERE fp.file_id = f.id AND fp.user_id = ${user.id}
+        )
+      )
+  `;
+  return rows.map((r) => r.folder_path);
+}
+
+export async function listSubfolders(
+  user: { id: string; role: string } | null,
+  currentPath: string,
+): Promise<string[]> {
+  const allPaths = await listUserFolderPaths(user);
+  return getImmediateSubfolders(currentPath, allPaths);
+}
+

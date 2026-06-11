@@ -1,5 +1,6 @@
 import { db } from './db';
-import { redis, getJSON, setJSON, NS, redisKey } from './redis';
+import { redis, NS, redisKey } from './redis';
+import { getJSON, setJSON } from './cache';
 import { getPermittedFiles } from './permissions';
 import { FileMetaRecord } from './file-meta';
 import crypto from 'crypto';
@@ -201,9 +202,11 @@ export async function searchFiles(
   // Map to FileMetaRecord
   const results: FileMetaRecord[] = rawFiles.map((file) => ({
     id: file.id,
+    ownerId: file.ownerId,
+    objectKey: file.objectKey,
     displayName: file.displayName,
     mimeType: file.mimeType,
-    size: Number(file.size),
+    size: file.size.toString(),
     owner: file.owner,
     tags: file.tags.map((ft: any) => ft.tag.value),
     visibility: file.visibility,
