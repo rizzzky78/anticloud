@@ -9,13 +9,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FolderIcon, UploadCloud } from "lucide-react";
+import { FolderIcon, UploadCloud, Download } from "lucide-react";
 import { FileBucket, FileListEntry } from "@/lib/file-list";
 import { FileRow } from "@/components/file-row";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { UploadDialog } from "@/components/upload-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useJobs } from "@/components/jobs-context";
+import { toast } from "sonner";
 
 interface FileListProps {
   buckets?: FileBucket[];
@@ -38,6 +41,93 @@ export function FileList({
 }: FileListProps) {
   const router = useRouter();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { addJob } = useJobs();
+
+  const handleSelectChange = (fileId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(fileId);
+      } else {
+        next.delete(fileId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = (bucketFiles: FileListEntry[], checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      bucketFiles.forEach((file) => {
+        if (checked) {
+          next.add(file.id);
+        } else {
+          next.delete(file.id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDownload = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDownloading(true);
+    const toastId = toast.loading(`Preparing bulk download for ${selectedIds.size} files...`);
+
+    try {
+      const res = await fetch("/api/files/bulk-download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileIds: Array.from(selectedIds),
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Bulk download failed");
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data.async && data.jobId) {
+          addJob(data.jobId);
+          toast.success("Download job enqueued!", {
+            id: toastId,
+            description: "Track progress in your task console.",
+          });
+          clearSelection();
+        } else {
+          toast.error("Invalid response from server", { id: toastId });
+        }
+      } else {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "archive.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        toast.success("Download started!", { id: toastId });
+        clearSelection();
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to download files", { id: toastId });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const getFolderName = (path: string) => {
     const segments = path.split("/").filter(Boolean);
@@ -119,6 +209,16 @@ export function FileList({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[40px] p-4 py-3">
+                      <Checkbox
+                        checked={
+                          bucket.files.length > 0 &&
+                          bucket.files.every((f) => selectedIds.has(f.id))
+                        }
+                        onCheckedChange={(checked) => handleSelectAll(bucket.files, !!checked)}
+                        aria-label="Select all files in this section"
+                      />
+                    </TableHead>
                     <TableHead className="w-[45%] p-4 py-3">Name</TableHead>
                     <TableHead className="hidden sm:table-cell py-3">Size</TableHead>
                     <TableHead className="hidden md:table-cell py-3">Access</TableHead>
@@ -135,6 +235,8 @@ export function FileList({
                       userRole={userRole}
                       folderPaths={folderPaths}
                       onSuccess={handleSuccess}
+                      isSelected={selectedIds.has(file.id)}
+                      onSelectChange={(checked) => handleSelectChange(file.id, checked)}
                     />
                   ))}
                 </TableBody>
@@ -150,6 +252,47 @@ export function FileList({
         currentFolderPath={currentFolderPath}
         onSuccess={handleSuccess}
       />
+
+      {/* Floating Selection Toolbar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-background/85 dark:bg-card/85 backdrop-blur-md px-6 py-3.5 rounded-full border shadow-xl animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">
+              {selectedIds.size} {selectedIds.size === 1 ? "file" : "files"} selected
+            </span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={clearSelection}
+              disabled={isDownloading}
+              className="text-xs h-8 px-3 rounded-full cursor-pointer hover:bg-muted"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="default"
+              size="xs"
+              onClick={handleBulkDownload}
+              disabled={isDownloading}
+              className="text-xs h-8 px-4 rounded-full cursor-pointer shadow-md bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
+            >
+              {isDownloading ? (
+                <>
+                  <span className="size-3 animate-spin border-2 border-current border-t-transparent rounded-full" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Download className="size-3.5" /> Download
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

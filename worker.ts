@@ -19,10 +19,67 @@ async function main() {
       }
       
       case "BULK_ARCHIVE": {
-        // Handled below or via another script
-        // For Phase 09, we'll leave it as a stub, and implement async zip later if needed
-        console.log("BULK_ARCHIVE not fully implemented yet");
-        return { success: true };
+        const { fileIds, userId } = job.payload as { fileIds: string[]; userId: string };
+
+        // 1. Resolve permitted files
+        const { getPermittedFiles } = await import("./lib/permissions");
+        const permitted = await getPermittedFiles(userId);
+        const permittedIds = new Set(permitted.map((f) => f.id));
+
+        // 2. Fetch full file metadata
+        const { db } = await import("./lib/db");
+        const files = await db.file.findMany({
+          where: { id: { in: fileIds } },
+          select: { id: true, displayName: true, objectKey: true },
+        });
+
+        // 3. Build ZIP
+        const archiverFactory = require("archiver");
+        const archive = archiverFactory("zip", { zlib: { level: 0 } });
+
+        const { PassThrough } = await import("node:stream");
+        const passThroughStream = new PassThrough();
+
+        const { buildObjectKey, KeyPrefix, putObject, presignedGetUrl } = await import("./lib/storage");
+        const { key: newKey } = buildObjectKey({ prefix: KeyPrefix.archive });
+
+        // Start upload
+        const uploadPromise = putObject(newKey, passThroughStream);
+
+        let manifest = "Bulk Download Manifest\n\n";
+
+        archive.pipe(passThroughStream);
+
+        for (const reqFileId of fileIds) {
+          const file = files.find((f: { id: string }) => f.id === reqFileId);
+          if (!file) {
+            manifest += `[EXCLUDED] ID ${reqFileId}: File not found\n`;
+            continue;
+          }
+          if (!permittedIds.has(file.id)) {
+            manifest += `[EXCLUDED] ${file.displayName}: Access denied\n`;
+            continue;
+          }
+          try {
+            const { getObjectStream } = await import("./lib/storage");
+            const stream = await getObjectStream(file.objectKey);
+            archive.append(stream, { name: file.displayName });
+            manifest += `[INCLUDED] ${file.displayName}\n`;
+          } catch (err: any) {
+            manifest += `[EXCLUDED] ${file.displayName}: Storage error (${err.message})\n`;
+          }
+        }
+
+        archive.append(manifest, { name: "manifest.txt" });
+        await archive.finalize();
+
+        // Wait for upload to complete
+        await uploadPromise;
+
+        // Generate a 1-hour presigned URL
+        const downloadUrl = await presignedGetUrl(newKey, 3600);
+
+        return { success: true, downloadUrl };
       }
 
       case "TTL_EXPIRY": {

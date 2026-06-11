@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,8 @@ interface FileRowProps {
   userRole: string;
   folderPaths: string[];
   onSuccess: () => void;
+  isSelected?: boolean;
+  onSelectChange?: (checked: boolean) => void;
 }
 
 export function FileRow({
@@ -67,6 +70,8 @@ export function FileRow({
   userRole,
   folderPaths,
   onSuccess,
+  isSelected = false,
+  onSelectChange,
 }: FileRowProps) {
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isMoveOpen, setIsMoveOpen] = useState(false);
@@ -112,6 +117,15 @@ export function FileRow({
   return (
     <>
       <TableRow className="group hover:bg-muted/50 cursor-pointer transition-colors">
+        {onSelectChange && (
+          <TableCell className="w-[40px] p-4 py-3" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(checked) => onSelectChange(!!checked)}
+              aria-label={`Select ${file.displayName}`}
+            />
+          </TableCell>
+        )}
         <TableCell className="font-medium p-4 py-3" onClick={() => window.location.href = `/files/${file.id}`}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded bg-muted/80 text-muted-foreground group-hover:bg-background group-hover:text-primary transition-colors">

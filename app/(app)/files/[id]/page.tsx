@@ -107,6 +107,55 @@ export default async function FileDetailPage({ params }: PageProps) {
 
   const mappedTags = tags.map((t) => t.tag.value);
 
+  // Fetch derivatives and parent file
+  const fileRecord = await db.file.findUnique({
+    where: { id },
+    select: { derivedFromId: true },
+  });
+  const derivedFromId = fileRecord?.derivedFromId ?? null;
+
+  const [derivatives, parentFile] = await Promise.all([
+    db.file.findMany({
+      where: { derivedFromId: id, deletedAt: null },
+      select: {
+        id: true,
+        displayName: true,
+        size: true,
+        mimeType: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    derivedFromId
+      ? db.file.findUnique({
+          where: { id: derivedFromId },
+          select: {
+            id: true,
+            displayName: true,
+            size: true,
+            mimeType: true,
+            createdAt: true,
+          },
+        })
+      : null,
+  ]);
+
+  const serializedDerivatives = derivatives.map(d => ({
+    id: d.id,
+    displayName: d.displayName,
+    size: d.size.toString(),
+    mimeType: d.mimeType,
+    createdAt: d.createdAt.toISOString(),
+  }));
+
+  const serializedParentFile = parentFile ? {
+    id: parentFile.id,
+    displayName: parentFile.displayName,
+    size: parentFile.size.toString(),
+    mimeType: parentFile.mimeType,
+    createdAt: parentFile.createdAt.toISOString(),
+  } : null;
+
   return (
     <FileDetailClient
       file={file}
@@ -116,6 +165,8 @@ export default async function FileDetailPage({ params }: PageProps) {
       initialTags={mappedTags}
       initialMentions={mappedMentions}
       permissionLevel={level}
+      initialDerivatives={serializedDerivatives}
+      initialParentFile={serializedParentFile}
     />
   );
 }

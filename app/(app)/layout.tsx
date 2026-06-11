@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { JobsProvider } from "@/components/jobs-context";
 
 export default async function AppLayout({
   children,
@@ -21,11 +22,13 @@ export default async function AppLayout({
         } as React.CSSProperties
       }
     >
-      <AppSidebar user={session.user} />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col">{children}</div>
-      </SidebarInset>
+      <JobsProvider>
+        <AppSidebar user={session.user} />
+        <SidebarInset>
+          <SiteHeader />
+          <div className="flex flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </JobsProvider>
     </SidebarProvider>
   );
 }

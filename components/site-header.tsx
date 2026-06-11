@@ -2,7 +2,9 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { BellIcon, SearchIcon } from "lucide-react"
+import { BellIcon, SearchIcon, Briefcase } from "lucide-react"
+import { useJobs } from "@/components/jobs-context"
+import { JobsDrawer } from "@/components/jobs-drawer"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -12,6 +14,8 @@ import { NotificationsPopover } from "@/components/notifications-popover"
 
 export function SiteHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const { setDrawerOpen, jobs } = useJobs()
+  const runningCount = jobs.filter(j => j.status === "PENDING" || j.status === "RUNNING").length
 
   return (
     <header className="flex h-(--header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-(--header-height)">
@@ -39,6 +43,21 @@ export function SiteHeader() {
           <SearchCommand open={isSearchOpen} onOpenChange={setIsSearchOpen} />
           
           <NotificationsPopover />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 relative text-muted-foreground hover:text-foreground cursor-pointer"
+            onClick={() => setDrawerOpen(true)}
+            title="Tasks Console"
+          >
+            <Briefcase className="size-[17px]" />
+            {runningCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-sky-500 animate-pulse border border-background" />
+            )}
+          </Button>
+
+          <JobsDrawer />
         </div>
       </div>
     </header>

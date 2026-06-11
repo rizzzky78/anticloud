@@ -43,13 +43,13 @@ Plan: [`plan/ui/`](plan/ui/README.md). `⛔` = blocked on backend Phase 10.
 
 - [x] **UI0 Shell** — 00.1 layout · 00.2 sidebar · 00.3 header · 00.4 providers · 00.5 primitives · 00.6 access helper
 - [x] **UI1 Auth** — 01.1 sign-in · 01.2 sign-up · 01.3 layout · 01.4 routing
-- [ ] **UI2 Browser** — 02.1 page · 02.2 row/bucket · 02.3 actions · 02.4 states · 02.5 paging/folders
-- [ ] **UI3 Upload** — 03.1 dialog · 03.2 progress · 03.3 queue · 03.4 replace · 03.5 folder target
+- [x] **UI2 Browser** — 02.1 page · 02.2 row/bucket · 02.3 actions · 02.4 states · 02.5 paging/folders
+- [x] **UI3 Upload** — 03.1 dialog · 03.2 progress · 03.3 queue · 03.4 replace · 03.5 folder target
 - [x] **UI4 Detail** — 04.1 page · 04.2 preview/download · 04.3 edits · 04.4 config panel · 04.5 delete/recover
 - [x] **UI5 Collab** — 05.1 tags · 05.2 mentions · 05.3 notes · 05.4 history
 - [x] **UI6 Sharing** — 06.1 share dialog · 06.2 access summary · 06.3 gated entry
 - [x] **UI7 Search** — 07.1 palette · 07.2 results page · 07.3 filters · 07.4 states
 - [x] **UI8 Notifications** — 08.1 badge · 08.2 popover · 08.3 page
 - [x] **UI9 Admin** — 09.1 guard · 09.2 roles · 09.3 recycle bin · 09.4 audit · 09.5 jobs (metrics)
-- [ ] **UI10 Settings** — 10.1 shell · 10.2 profile · 10.3 appearance · 10.4 account/sign-out
-- [ ] **UI11 Bulk** — 11.0 job-status read · 11.1 select · 11.2 bulk dl · 11.3 polling · 11.4 compress · 11.5 jobs drawer
+- [x] **UI10 Settings** — 10.1 shell · 10.2 profile · 10.3 appearance · 10.4 account/sign-out
+- [x] **UI11 Bulk** — 11.0 job-status read · 11.1 select · 11.2 bulk dl · 11.3 polling · 11.4 compress · 11.5 jobs drawer

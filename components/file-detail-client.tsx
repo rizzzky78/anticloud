@@ -69,8 +69,18 @@ import { TextFilePreview } from "@/components/text-file-preview";
 import { NoteHistoryDialog } from "@/components/note-history";
 import { FileSharingPanel } from "@/components/file-sharing-panel";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
+import { compress, promoteDerivative } from "@/actions/compress";
+import { useJobs } from "@/components/jobs-context";
 import { FileMetaRecord } from "@/lib/file-meta";
 import { toast } from "sonner";
+
+export interface DerivedFile {
+  id: string;
+  displayName: string;
+  size: string;
+  mimeType: string;
+  createdAt: string;
+}
 
 interface MentionedUser {
   id: string;
@@ -93,6 +103,8 @@ interface FileDetailClientProps {
   initialTags: string[];
   initialMentions: MentionedUser[];
   permissionLevel: string;
+  initialDerivatives?: DerivedFile[];
+  initialParentFile?: DerivedFile | null;
 }
 
 export function FileDetailClient({
@@ -103,9 +115,18 @@ export function FileDetailClient({
   initialTags,
   initialMentions,
   permissionLevel,
+  initialDerivatives = [],
+  initialParentFile = null,
 }: FileDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const { addJob } = useJobs();
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isPromoting, setIsPromoting] = useState<string | null>(null);
+
+  const derivatives = initialDerivatives;
+  const parentFile = initialParentFile;
 
   // Dialog & panel states
   const [isRenameOpen, setIsRenameOpen] = useState(false);
@@ -163,6 +184,37 @@ export function FileDetailClient({
         toast.error(err?.message || "Failed to recover file");
       }
     });
+  };
+
+  const handleCompress = async () => {
+    setIsCompressing(true);
+    const toastId = toast.loading("Queueing compression job...");
+    try {
+      const { jobId } = await compress({ fileId: file.id });
+      addJob(jobId);
+      toast.success("Compression job enqueued!", {
+        id: toastId,
+        description: "You can track the job progress in your tasks console.",
+      });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to start compression", { id: toastId });
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
+  const handlePromote = async (derivativeId: string) => {
+    setIsPromoting(derivativeId);
+    const toastId = toast.loading("Swapping files to make canonical...");
+    try {
+      await promoteDerivative({ derivativeId });
+      toast.success("File promoted to canonical!", { id: toastId });
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to promote file", { id: toastId });
+    } finally {
+      setIsPromoting(null);
+    }
   };
 
   const wrapWithTooltip = (element: React.ReactNode, disabled: boolean, reason: string) => {
@@ -469,6 +521,99 @@ export function FileDetailClient({
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Compression & Derivatives Card */}
+              <Card className="mt-6">
+                <CardHeader className="py-4 border-b">
+                  <CardTitle className="text-sm font-semibold flex items-center justify-between">
+                    <span>COMPRESSION & DERIVED VERSIONS</span>
+                    {parentFile && (
+                      <Badge variant="outline" className="bg-purple-500/5 text-purple-600 dark:text-purple-400">
+                        Derived Version
+                      </Badge>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 space-y-4">
+                  {parentFile && (
+                    <div className="flex items-center justify-between gap-4 p-3 rounded-lg border bg-muted/20">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Original Source File</p>
+                        <Link href={`/files/${parentFile.id}`} className="text-sm font-medium hover:underline text-primary">
+                          {parentFile.displayName}
+                        </Link>
+                        <p className="text-[10px] text-muted-foreground">{formatBytes(BigInt(parentFile.size))} • {parentFile.mimeType}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {derivatives.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Derived Versions</p>
+                      <div className="space-y-2.5">
+                        {derivatives.map((d) => {
+                          const originalSize = BigInt(file.size);
+                          const compressedSize = BigInt(d.size);
+                          const ratio = originalSize > 0 
+                            ? ((1 - Number(compressedSize) / Number(originalSize)) * 100).toFixed(0)
+                            : "0";
+                          return (
+                            <div key={d.id} className="flex items-center justify-between gap-4 p-3.5 rounded-lg border bg-card shadow-xs">
+                              <div className="min-w-0 space-y-0.5">
+                                <Link href={`/files/${d.id}`} className="text-sm font-medium hover:underline text-foreground block truncate">
+                                  {d.displayName}
+                                </Link>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {formatBytes(compressedSize)} • {d.mimeType} • <span className="font-semibold text-emerald-600 dark:text-emerald-400">Saved {ratio}%</span>
+                                </p>
+                              </div>
+                              {userCanManage && (
+                                <Button
+                                  variant="outline"
+                                  size="xs"
+                                  onClick={() => handlePromote(d.id)}
+                                  disabled={isPromoting !== null || isCompressing}
+                                  className="text-xs h-8 cursor-pointer shrink-0"
+                                >
+                                  {isPromoting === d.id ? "Promoting..." : "Make Canonical"}
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {!parentFile && file.mimeType !== "application/gzip" && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Non-Destructive Gzip Compression</p>
+                        <p className="text-[11px] text-muted-foreground">Compress this file server-side to save storage space. The original file remains intact.</p>
+                      </div>
+                      <Button
+                        onClick={handleCompress}
+                        disabled={isCompressing || isPromoting !== null || isMutateDisabled}
+                        className="self-start sm:self-center cursor-pointer shadow-xs gap-1.5"
+                      >
+                        {isCompressing ? (
+                          <>
+                            <span className="size-3 animate-spin border-2 border-current border-t-transparent rounded-full" />
+                            Queueing...
+                          </>
+                        ) : (
+                          "Compress File"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {file.mimeType === "application/gzip" && !parentFile && (
+                    <p className="text-xs text-muted-foreground italic bg-muted/20 p-3 rounded-lg">
+                      This is a compressed gzip file.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* Notes tab */}
