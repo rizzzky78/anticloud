@@ -31,7 +31,9 @@
 
 - Plan lives in [`plan/`](plan/README.md) — one file per phase, worked **in order** (deps in the index table).
 - Each numbered step = one agent action with its own acceptance criteria. Do only the step's deliverables.
-- Track work in [`PROGRESS.md`](PROGRESS.md): tick a step when its acceptance criteria pass. Don't start a phase whose deps are unchecked.- No need do type check, lint or build after changes
-- Lte user do cmd like `bunx prisma migrate/generate`
+- Track work in [`PROGRESS.md`](PROGRESS.md): tick a step when its acceptance criteria pass. Don't start a phase whose deps are unchecked.
+- No need do verification/validation, type check, lint or build after changes
+- No need to run dev server
+- Let user do cmd like `bunx prisma migrate/generate`
 - always use Bun to install npm packages
 - always aim for production ready code, never use mockup/placeholder data

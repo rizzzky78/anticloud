@@ -39,6 +39,7 @@ import {
   Lock,
   Globe,
   Settings,
+  Share2,
 } from "lucide-react";
 import { FileListEntry } from "@/lib/file-list";
 import { formatBytes, formatRelativeDate } from "@/lib/format";
@@ -48,6 +49,7 @@ import { RenameDialog } from "@/components/rename-dialog";
 import { MoveDialog } from "@/components/move-dialog";
 import { VisibilityDialog } from "@/components/visibility-dialog";
 import { ReplaceFileDialog } from "@/components/replace-file-dialog";
+import { FileShareDialog } from "@/components/file-share-dialog";
 import { softDeleteFile } from "@/actions/file-config";
 import { toast } from "sonner";
 
@@ -71,6 +73,7 @@ export function FileRow({
   const [isVisibilityOpen, setIsVisibilityOpen] = useState(false);
   const [isReplaceOpen, setIsReplaceOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const FileIconComponent = getFileIcon(file.mimeType);
@@ -207,6 +210,9 @@ export function FileRow({
                   <DropdownMenuItem onClick={() => setIsVisibilityOpen(true)}>
                     <Eye className="size-4 mr-2" /> Visibility
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsShareOpen(true)}>
+                    <Share2 className="size-4 mr-2" /> Share
+                  </DropdownMenuItem>
                   {wrapWithTooltip(
                     <DropdownMenuItem
                       onClick={() => setIsReplaceOpen(true)}
@@ -267,6 +273,23 @@ export function FileRow({
             onOpenChange={setIsReplaceOpen}
             fileId={file.id}
             fileName={file.displayName}
+            onSuccess={onSuccess}
+          />
+          <FileShareDialog
+            isOpen={isShareOpen}
+            onOpenChange={setIsShareOpen}
+            fileId={file.id}
+            file={file}
+            currentUserRole={userRole}
+            currentUserId={userId}
+            onOpenVisibility={() => {
+              setIsShareOpen(false);
+              setIsVisibilityOpen(true);
+            }}
+            onOpenConfig={() => {
+              // Redirect to detail page to configure lifecycle
+              window.location.href = `/files/${file.id}`;
+            }}
             onSuccess={onSuccess}
           />
           <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

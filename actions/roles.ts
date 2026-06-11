@@ -89,3 +89,41 @@ export async function revokeFileRole(payload: z.infer<typeof revokeFileRoleSchem
   // TODO: Phase 10 Audit Log
   return { success: true };
 }
+
+const getFilePermissionsSchema = z.object({
+  fileId: z.string(),
+});
+
+export async function getFilePermissions(payload: z.infer<typeof getFilePermissionsSchema>) {
+  const session = await getCurrentUser();
+  if (!session) throw AppError.unauthorized();
+
+  const { fileId } = getFilePermissionsSchema.parse(payload);
+
+  // Requires at least GUEST access on the file to view who has access
+  await requireAccess(session.user as any, fileId, "GUEST");
+
+  return db.filePermission.findMany({
+    where: { fileId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          username: true,
+          role: true,
+        },
+      },
+      grantedBy: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+

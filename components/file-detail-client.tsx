@@ -67,6 +67,7 @@ import { FileMentions } from "@/components/file-mentions";
 import { FileNotePanel } from "@/components/file-note-panel";
 import { TextFilePreview } from "@/components/text-file-preview";
 import { NoteHistoryDialog } from "@/components/note-history";
+import { FileSharingPanel } from "@/components/file-sharing-panel";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
 import { FileMetaRecord } from "@/lib/file-meta";
 import { toast } from "sonner";
@@ -491,30 +492,24 @@ export function FileDetailClient({
               />
             </TabsContent>
 
-            {/* Sharing tab placeholder */}
+            {/* Sharing tab */}
             <TabsContent value="sharing" className="outline-hidden">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Share2 className="size-4 text-muted-foreground" /> File Access & Sharing
+                    <Share2 className="size-4 text-primary" /> File Access & Sharing
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6 text-center text-muted-foreground space-y-3">
-                  <div className="flex justify-center">
-                    <div className="p-3 bg-muted/80 rounded-full text-muted-foreground">
-                      <Share2 className="size-8" />
-                    </div>
-                  </div>
-                  <h3 className="font-semibold text-foreground">Sharing settings are coming soon</h3>
-                  <p className="text-xs max-w-md mx-auto leading-relaxed">
-                    Granular file-level sharing (adding explicit roles, viewing access control summary lists, and setting up access groups) will be fully configured in Phase 06.
-                  </p>
-                  <div className="pt-2 text-xs bg-muted/30 rounded border p-3 inline-flex items-center gap-2">
-                    <Info className="size-3.5 shrink-0 text-muted-foreground" /> Current level:{" "}
-                    <span className="font-semibold text-foreground uppercase tracking-wider text-[0.65rem] px-1.5 py-0.5 rounded bg-muted">
-                      {permissionLevel}
-                    </span>
-                  </div>
+                <CardContent>
+                  <FileSharingPanel
+                    fileId={file.id}
+                    file={file}
+                    currentUserRole={user.role}
+                    currentUserId={user.id}
+                    onOpenVisibility={() => setIsVisibilityOpen(true)}
+                    onOpenConfig={() => setIsConfigOpen(true)}
+                    onSuccess={handleRefresh}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
