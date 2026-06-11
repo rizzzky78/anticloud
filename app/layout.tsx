@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter, Noto_Sans, Playfair_Display } from "next/font
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { Toaster } from "@/components/ui/sonner"
 
 const playfairDisplayHeading = Playfair_Display({subsets:['latin'],variable:'--font-heading'});
 
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           {children}
+          <Toaster />
         </TooltipProvider>
       </body>
     </html>

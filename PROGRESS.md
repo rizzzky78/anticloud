@@ -6,13 +6,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 - [x] 0.1 env contract  · 0.2 prisma · 0.3 redis · 0.4 minio · 0.5 errors · 0.6 lib layout
 
 ## P1 — Auth
-- [ ] 1.1 better-auth · 1.2 route · 1.3 redis session · 1.4 middleware · 1.5 rate-limit · 1.6 login UI
+- [x] 1.1 better-auth · 1.2 route · 1.3 redis session · 1.4 middleware · 1.5 rate-limit · 1.6 login UI
 
 ## P2 — RBAC
-- [ ] 2.1 models · 2.2 resolver · 2.3 perm cache · 2.4 perm middleware · 2.5 role mgmt
+- [x] 2.1 models · 2.2 resolver · 2.3 perm cache · 2.4 perm middleware · 2.5 role mgmt
 
 ## P3 — Storage core
-- [ ] 3.1 file model · 3.2 upload · 3.3 download · 3.4 replace · 3.5 hardening
+- [x] 3.1 file model · 3.2 upload · 3.3 download · 3.4 replace · 3.5 hardening
 
 ## P4 — File metadata
 - [ ] 4.1 mutations · 4.2 meta cache · 4.3 date grouping · 4.4 public/private · 4.5 unowned/orphan

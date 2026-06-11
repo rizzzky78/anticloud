@@ -108,3 +108,24 @@ export function statObject(key: string): Promise<BucketItemStat> {
 export function presignedGetUrl(key: string, ttlSeconds: number): Promise<string> {
   return storage.presignedGetObject(BUCKET, key, ttlSeconds);
 }
+
+/**
+ * Put an object in MinIO then run a callback (e.g. a DB write). If the
+ * callback throws, the just-written object is removed so no orphan remains.
+ * The original error is always re-thrown.
+ */
+export async function putObjectCompensated(
+  key: string,
+  body: Readable | Buffer | string,
+  size: number | undefined,
+  metadata: ItemBucketMetadata | undefined,
+  afterPut: () => Promise<void>,
+): Promise<void> {
+  await putObject(key, body, size, metadata);
+  try {
+    await afterPut();
+  } catch (err) {
+    await removeObject(key).catch(() => {});
+    throw err;
+  }
+}
