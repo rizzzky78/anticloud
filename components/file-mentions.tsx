@@ -1,10 +1,17 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/badge"; // Wait, avatar components in components/ui/avatar.tsx
-import { Avatar as UiAvatar, AvatarImage as UiAvatarImage, AvatarFallback as UiAvatarFallback } from "@/components/ui/avatar";
+import {
+  Avatar as UiAvatar,
+  AvatarImage as UiAvatarImage,
+  AvatarFallback as UiAvatarFallback,
+} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -62,7 +69,9 @@ export function FileMentions({
       try {
         const users = await searchUsers(query.trim());
         // Filter out already mentioned users
-        const filtered = users.filter((u) => !mentions.some((m) => m.id === u.id));
+        const filtered = users.filter(
+          (u) => !mentions.some((m) => m.id === u.id),
+        );
         setSearchResults(filtered);
       } catch (err) {
         console.error("Failed to search users", err);
@@ -133,7 +142,8 @@ export function FileMentions({
                 <CommandList>
                   {loading && (
                     <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
-                      <Loader2 className="size-3.5 animate-spin mr-1.5" /> Searching...
+                      <Loader2 className="size-3.5 animate-spin mr-1.5" />{" "}
+                      Searching...
                     </div>
                   )}
 
@@ -146,13 +156,17 @@ export function FileMentions({
                           className="flex items-center gap-2 py-2"
                         >
                           <UiAvatar className="size-5">
-                            {user.image && <UiAvatarImage src={user.image} alt={user.name} />}
+                            {user.image && (
+                              <UiAvatarImage src={user.image} alt={user.name} />
+                            )}
                             <UiAvatarFallback className="text-[0.6rem]">
                               {getInitials(user.name)}
                             </UiAvatarFallback>
                           </UiAvatar>
                           <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-medium truncate">{user.name}</span>
+                            <span className="text-xs font-medium truncate">
+                              {user.name}
+                            </span>
                             <span className="text-[0.65rem] text-muted-foreground truncate">
                               {user.username ? `@${user.username}` : user.email}
                             </span>
@@ -188,10 +202,14 @@ export function FileMentions({
           >
             <UiAvatar className="size-6 shrink-0">
               {user.image && <UiAvatarImage src={user.image} alt={user.name} />}
-              <UiAvatarFallback className="text-[0.65rem]">{getInitials(user.name)}</UiAvatarFallback>
+              <UiAvatarFallback className="text-[0.65rem]">
+                {getInitials(user.name)}
+              </UiAvatarFallback>
             </UiAvatar>
             <div className="flex flex-col min-w-0 flex-1">
-              <span className="text-xs font-medium truncate leading-none">{user.name}</span>
+              <span className="text-xs font-medium truncate leading-none">
+                {user.name}
+              </span>
               <span className="text-[0.65rem] text-muted-foreground truncate mt-0.5">
                 {user.username ? `@${user.username}` : user.email}
               </span>
@@ -211,12 +229,15 @@ export function FileMentions({
         ))}
 
         {mentions.length === 0 && (
-          <span className="text-xs text-muted-foreground italic">No mentions added yet</span>
+          <span className="text-xs text-muted-foreground italic">
+            No mentions added yet
+          </span>
         )}
 
         {isMentionRestricted && (
           <p className="text-[0.7rem] text-purple-600 dark:text-purple-400 leading-normal bg-purple-500/10 p-2 rounded border border-purple-500/20 mt-1">
-            ℹ️ Access to this file is gated: only users mentioned here or who have explicit permission grants can view it.
+            ℹ️ Access to this file is gated: only users mentioned here or who
+            have explicit permission grants can view it.
           </p>
         )}
       </div>

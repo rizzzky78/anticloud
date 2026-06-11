@@ -7,6 +7,7 @@ import { assertWriteAccess } from "@/lib/file-access";
 import { enqueueJob } from "@/lib/jobs";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { bustFileMeta } from "@/lib/file-meta";
 
 const compressSchema = z.object({
   fileId: z.string().min(1),

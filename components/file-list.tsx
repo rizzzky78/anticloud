@@ -213,7 +213,7 @@ export function FileList({
                       <Checkbox
                         checked={
                           bucket.files.length > 0 &&
-                          bucket.files.every((f) => selectedIds.has(f.id))
+                          bucket.files.every((f: any) => selectedIds.has(f.id))
                         }
                         onCheckedChange={(checked) => handleSelectAll(bucket.files, !!checked)}
                         aria-label="Select all files in this section"

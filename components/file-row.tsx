@@ -98,7 +98,11 @@ export function FileRow({
     });
   };
 
-  const wrapWithTooltip = (element: React.ReactNode, disabled: boolean, reason: string) => {
+  const wrapWithTooltip = (
+    element: React.ReactNode,
+    disabled: boolean,
+    reason: string,
+  ) => {
     if (!disabled) return element;
     return (
       <TooltipProvider>
@@ -118,7 +122,10 @@ export function FileRow({
     <>
       <TableRow className="group hover:bg-muted/50 cursor-pointer transition-colors">
         {onSelectChange && (
-          <TableCell className="w-[40px] p-4 py-3" onClick={(e) => e.stopPropagation()}>
+          <TableCell
+            className="w-[40px] p-4 py-3"
+            onClick={(e) => e.stopPropagation()}
+          >
             <Checkbox
               checked={isSelected}
               onCheckedChange={(checked) => onSelectChange(!!checked)}
@@ -126,7 +133,10 @@ export function FileRow({
             />
           </TableCell>
         )}
-        <TableCell className="font-medium p-4 py-3" onClick={() => window.location.href = `/files/${file.id}`}>
+        <TableCell
+          className="font-medium p-4 py-3"
+          onClick={() => (window.location.href = `/files/${file.id}`)}
+        >
           <div className="flex items-center gap-3">
             <div className="p-2 rounded bg-muted/80 text-muted-foreground group-hover:bg-background group-hover:text-primary transition-colors">
               <FileIconComponent className="size-4 shrink-0" />
@@ -141,13 +151,22 @@ export function FileRow({
             </div>
           </div>
         </TableCell>
-        <TableCell className="hidden sm:table-cell py-3" onClick={() => window.location.href = `/files/${file.id}`}>
+        <TableCell
+          className="hidden sm:table-cell py-3"
+          onClick={() => (window.location.href = `/files/${file.id}`)}
+        >
           {formatBytes(file.size)}
         </TableCell>
-        <TableCell className="hidden md:table-cell py-3" onClick={() => window.location.href = `/files/${file.id}`}>
+        <TableCell
+          className="hidden md:table-cell py-3"
+          onClick={() => (window.location.href = `/files/${file.id}`)}
+        >
           <div className="flex flex-wrap gap-1.5">
             {file.visibility === "PUBLIC" ? (
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none"
+              >
                 <Globe className="size-3 mr-1" /> Public
               </Badge>
             ) : (
@@ -156,23 +175,35 @@ export function FileRow({
               </Badge>
             )}
             {file.visibility === "PUBLIC" && file.guestAccess && (
-              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none"
+              >
                 Guest
               </Badge>
             )}
             {file.isReadOnly && (
-              <Badge variant="destructive" className="bg-destructive/10 text-destructive border-none">
+              <Badge
+                variant="destructive"
+                className="bg-destructive/10 text-destructive border-none"
+              >
                 Read-only
               </Badge>
             )}
             {file.isMentionRestricted && (
-              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-none"
+              >
                 Gated
               </Badge>
             )}
           </div>
         </TableCell>
-        <TableCell className="hidden lg:table-cell py-3" onClick={() => window.location.href = `/files/${file.id}`}>
+        <TableCell
+          className="hidden lg:table-cell py-3"
+          onClick={() => (window.location.href = `/files/${file.id}`)}
+        >
           {formatRelativeDate(file.createdAt)}
         </TableCell>
         <TableCell className="text-right py-3 p-4">
@@ -194,7 +225,10 @@ export function FileRow({
                 </a>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href={`/files/${file.id}`} className="flex items-center w-full">
+                <Link
+                  href={`/files/${file.id}`}
+                  className="flex items-center w-full"
+                >
                   <Settings className="size-4 mr-2" /> Configure
                 </Link>
               </DropdownMenuItem>
@@ -209,7 +243,7 @@ export function FileRow({
                       <Edit2 className="size-4 mr-2" /> Rename
                     </DropdownMenuItem>,
                     isMutateDisabled,
-                    "This file is read-only"
+                    "This file is read-only",
                   )}
                   {wrapWithTooltip(
                     <DropdownMenuItem
@@ -219,7 +253,7 @@ export function FileRow({
                       <FolderInput className="size-4 mr-2" /> Move
                     </DropdownMenuItem>,
                     isMutateDisabled,
-                    "This file is read-only"
+                    "This file is read-only",
                   )}
                   <DropdownMenuItem onClick={() => setIsVisibilityOpen(true)}>
                     <Eye className="size-4 mr-2" /> Visibility
@@ -235,7 +269,7 @@ export function FileRow({
                       <RefreshCw className="size-4 mr-2" /> Replace
                     </DropdownMenuItem>,
                     isMutateDisabled,
-                    "This file is read-only"
+                    "This file is read-only",
                   )}
                   <DropdownMenuSeparator />
                   {wrapWithTooltip(
@@ -247,7 +281,7 @@ export function FileRow({
                       <Trash2 className="size-4 mr-2" /> Delete
                     </DropdownMenuItem>,
                     isMutateDisabled,
-                    "This file is read-only"
+                    "This file is read-only",
                   )}
                 </>
               )}
@@ -293,7 +327,7 @@ export function FileRow({
             isOpen={isShareOpen}
             onOpenChange={setIsShareOpen}
             fileId={file.id}
-            file={file}
+            file={file as any}
             currentUserRole={userRole}
             currentUserId={userId}
             onOpenVisibility={() => {
@@ -311,12 +345,15 @@ export function FileRow({
               <AlertDialogHeader>
                 <AlertDialogTitle>Move file to Recycle Bin?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to move &quot;{file.displayName}&quot; to the Recycle Bin?
-                  You can restore it within 30 days before it is permanently hard deleted.
+                  Are you sure you want to move &quot;{file.displayName}&quot;
+                  to the Recycle Bin? You can restore it within 30 days before
+                  it is permanently hard deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isPending}>
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={(e) => {
