@@ -84,6 +84,57 @@ export async function softDeleteFile(payload: unknown) {
   return { fileId };
 }
 
+const bulkFileIdsSchema = z.object({
+  fileIds: z.array(z.string().min(1)).min(1).max(200),
+});
+
+/**
+ * Soft-delete several files in one call. Each file is checked independently for
+ * write access and the read-only flag, so a single unauthorized or read-only
+ * file does not abort the whole batch. Returns the ids that succeeded and the
+ * ones that failed (with a reason) so the UI can report partial results.
+ * Blocked by isReadOnly per-file unless caller is SUPERADMIN.
+ */
+export async function bulkSoftDeleteFiles(payload: unknown) {
+  const session = await getCurrentUser();
+  if (!session) throw AppError.unauthorized();
+
+  const { fileIds } = bulkFileIdsSchema.parse(payload);
+  // De-duplicate while preserving caller intent.
+  const uniqueIds = Array.from(new Set(fileIds));
+
+  const deleted: string[] = [];
+  const failed: { fileId: string; reason: string }[] = [];
+
+  for (const fileId of uniqueIds) {
+    try {
+      const file = await assertWriteAccess(session.user as SessionUser, fileId);
+      assertNotReadOnly(file, session.user.role as string | undefined);
+
+      await db.file.update({
+        where: { id: fileId },
+        data: { deletedAt: new Date() },
+      });
+
+      await bustFileMeta(fileId);
+      await invalidatePermCache(null, fileId);
+      await recordAudit({
+        action: "file.soft_delete",
+        targetType: "file",
+        targetId: fileId,
+      });
+      deleted.push(fileId);
+    } catch (err) {
+      failed.push({
+        fileId,
+        reason: err instanceof AppError ? err.message : "Failed to delete file",
+      });
+    }
+  }
+
+  return { deleted, failed };
+}
+
 /**
  * Recover a soft-deleted file. SUPERADMIN only, within the 30-day grace window.
  */

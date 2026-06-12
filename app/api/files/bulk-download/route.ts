@@ -5,8 +5,13 @@ import { AppError } from "@/lib/result";
 import { db } from "@/lib/db";
 import { getPermittedFiles } from "@/lib/permissions";
 import { getObjectStream } from "@/lib/storage";
+import { Readable } from "node:stream";
 import * as archiver from "archiver";
 import { enqueueJob } from "@/lib/jobs";
+
+// Hard-depends on the Node runtime: node:stream (Readable.toWeb), archiver, and
+// MinIO object streams are unavailable on the Edge runtime.
+export const runtime = "nodejs";
 
 const bulkDownloadSchema = z.object({
   fileIds: z.array(z.string().min(1)),
@@ -60,26 +65,37 @@ export async function POST(req: Request) {
       select: { id: true, displayName: true, objectKey: true },
     });
 
-    // We will build a stream of a ZIP file directly back to the client
+    // We will build a stream of a ZIP file directly back to the client.
     const archiverFactory = require("archiver");
-    const archive = archiverFactory("zip", { zlib: { level: 0 } }) as archiver.Archiver; // store without compression or level 1 for speed
+    // level 0 = store (no compression) for speed; stored blobs are usually
+    // already-compressed media, so deflate would only burn CPU.
+    const archive = archiverFactory("zip", {
+      zlib: { level: 0 },
+    }) as archiver.Archiver;
 
-    // We can use a TransformStream to bridge archiver (Node stream) to Web Stream API for NextResponse
-    const { readable, writable } = new TransformStream();
-
-    // Create an adapter to write from Node to Web Stream
-    const writer = writable.getWriter();
-
-    archive.on("data", (chunk: any) => writer.write(chunk));
-    archive.on("end", () => writer.close());
+    // Per archiver docs, register warning/error handlers before finalize().
+    // Warnings (e.g. ENOENT) are non-fatal; a genuine error must destroy the
+    // stream so the client download fails fast instead of hanging on a
+    // truncated archive.
+    archive.on("warning", (err: any) => {
+      if (err?.code === "ENOENT") {
+        console.warn("Archive warning:", err);
+      } else {
+        console.error("Archive error (warning channel):", err);
+        archive.destroy(err);
+      }
+    });
     archive.on("error", (err: Error) => {
       console.error("Archive error:", err);
-      writer.abort(err);
+      archive.destroy(err);
     });
 
     let manifest = "Bulk Download Manifest\n\n";
 
-    // Build the archive asynchronously
+    // Append entries and finalize. archiver emits data as the client consumes
+    // it; Readable.toWeb() below applies proper backpressure, so we must NOT
+    // pump 'data' events into a writer manually (that ignored backpressure and
+    // could close the stream before pending writes flushed, truncating the zip).
     (async () => {
       for (const reqFileId of fileIds) {
         const file = files.find((f: { id: string }) => f.id === reqFileId);
@@ -103,15 +119,19 @@ export async function POST(req: Request) {
         }
       }
 
-      // Append manifest
+      // Append manifest, then finalize (no more entries after this).
       archive.append(manifest, { name: "manifest.txt" });
+      await archive.finalize();
+    })().catch((err) => {
+      console.error("Archive build error:", err);
+      archive.destroy(err);
+    });
 
-      // Finalize the archive
-      archive.finalize();
-    })();
+    // Bridge the archiver Node readable to a Web ReadableStream for NextResponse.
+    const webStream = Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>;
 
-    // Return the response as a downloadable attachment
-    return new NextResponse(readable, {
+    // Return the response as a downloadable attachment.
+    return new NextResponse(webStream, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": 'attachment; filename="archive.zip"',

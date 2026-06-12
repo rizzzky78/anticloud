@@ -15,15 +15,27 @@ import {
   Download,
   List,
   LayoutGrid,
+  Trash2,
 } from "lucide-react";
 import { FileBucket, FileListEntry } from "@/lib/file-list";
 import { FileRow } from "@/components/file-row";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
 import { UploadDialog } from "@/components/upload-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useJobs } from "@/components/jobs-context";
+import { bulkSoftDeleteFiles } from "@/actions/file-config";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +62,8 @@ export function FileList({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const { addJob } = useJobs();
 
@@ -136,6 +150,47 @@ export function FileList({
       toast.error(err.message || "Failed to download files", { id: toastId });
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsDeleting(true);
+    const count = selectedIds.size;
+    const toastId = toast.loading(
+      `Moving ${count} ${count === 1 ? "file" : "files"} to recycle bin...`,
+    );
+
+    try {
+      const { deleted, failed } = await bulkSoftDeleteFiles({
+        fileIds: Array.from(selectedIds),
+      });
+
+      if (deleted.length > 0 && failed.length === 0) {
+        toast.success(
+          `Moved ${deleted.length} ${
+            deleted.length === 1 ? "file" : "files"
+          } to recycle bin`,
+          { id: toastId },
+        );
+      } else if (deleted.length > 0 && failed.length > 0) {
+        toast.warning(
+          `Moved ${deleted.length} to recycle bin, ${failed.length} could not be deleted`,
+          { id: toastId },
+        );
+      } else {
+        toast.error(failed[0]?.reason || "Failed to delete files", {
+          id: toastId,
+        });
+      }
+
+      setIsDeleteOpen(false);
+      clearSelection();
+      router.refresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete files", { id: toastId });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -356,16 +411,25 @@ export function FileList({
               variant="outline"
               size="xs"
               onClick={clearSelection}
-              disabled={isDownloading}
+              disabled={isDownloading || isDeleting}
               className="text-xs h-8 px-3 rounded-full cursor-pointer hover:bg-muted"
             >
               Cancel
             </Button>
             <Button
+              variant="outline"
+              size="xs"
+              onClick={() => setIsDeleteOpen(true)}
+              disabled={isDownloading || isDeleting}
+              className="text-xs h-8 px-4 rounded-full cursor-pointer gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-3.5" /> Delete
+            </Button>
+            <Button
               variant="default"
               size="xs"
               onClick={handleBulkDownload}
-              disabled={isDownloading}
+              disabled={isDownloading || isDeleting}
               className="text-xs h-8 px-4 rounded-full cursor-pointer shadow-md bg-primary text-primary-foreground hover:bg-primary/90 gap-1.5"
             >
               {isDownloading ? (
@@ -382,6 +446,38 @@ export function FileList({
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Move {selectedIds.size}{" "}
+              {selectedIds.size === 1 ? "file" : "files"} to Recycle Bin?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The selected {selectedIds.size === 1 ? "file" : "files"} will be
+              moved to the Recycle Bin. You can restore{" "}
+              {selectedIds.size === 1 ? "it" : "them"} within 30 days before
+              permanent deletion. Read-only files and files you don&apos;t own
+              will be skipped.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                handleBulkDelete();
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting..." : "Move to Recycle Bin"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
