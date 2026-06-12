@@ -137,43 +137,12 @@ export function AuditClient({
   };
 
   const getActionBadge = (actionName: string) => {
-    if (actionName.startsWith("file.upload") || actionName.startsWith("file.compress")) {
-      return (
-        <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600 text-[10px] font-bold py-0.5 uppercase tracking-wide">
-          {actionName}
-        </Badge>
-      );
-    }
-    if (actionName.startsWith("file.download") || actionName.startsWith("file.permanent_url_serve")) {
-      return (
-        <Badge variant="secondary" className="bg-blue-600 hover:bg-blue-600 text-white text-[10px] font-bold py-0.5 uppercase tracking-wide">
-          {actionName}
-        </Badge>
-      );
-    }
-    if (actionName.startsWith("role.")) {
-      return (
-        <Badge variant="default" className="bg-purple-600 hover:bg-purple-600 text-[10px] font-bold py-0.5 uppercase tracking-wide">
-          {actionName}
-        </Badge>
-      );
-    }
+    let badgeClass = "border-zinc-200 bg-zinc-50 text-zinc-800 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300";
     if (actionName.startsWith("file.soft_delete") || actionName.startsWith("file.revoke")) {
-      return (
-        <Badge variant="destructive" className="text-[10px] font-bold py-0.5 uppercase tracking-wide">
-          {actionName}
-        </Badge>
-      );
-    }
-    if (actionName.startsWith("file.recover")) {
-      return (
-        <Badge variant="default" className="bg-amber-600 hover:bg-amber-600 text-[10px] font-bold py-0.5 uppercase tracking-wide">
-          {actionName}
-        </Badge>
-      );
+      badgeClass = "border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200";
     }
     return (
-      <Badge variant="outline" className="text-[10px] font-bold py-0.5 uppercase tracking-wide">
+      <Badge variant="outline" className={`${badgeClass} text-[10px] font-bold py-0.5 uppercase tracking-wide`}>
         {actionName}
       </Badge>
     );

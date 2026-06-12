@@ -110,9 +110,9 @@ export function NoteHistoryDialog({
                             <User className="size-3" /> {version.authorName || "System / Unknown"}
                           </span>
                           <span>•</span>
-                          <span>{formatRelativeDate(new Date(version.createdAt))}</span>
+                          <span>{formatRelativeDate(new Date(version.createdAt).toISOString())}</span>
                           {isCurrent && (
-                            <Badge variant="default" className="text-[0.65rem] h-4 px-1 rounded-sm leading-none bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none">
+                            <Badge variant="secondary" className="text-[0.65rem] h-4 px-1.5 rounded-sm leading-none bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border-none">
                               Current Version
                             </Badge>
                           )}

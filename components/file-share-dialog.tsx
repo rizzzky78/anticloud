@@ -16,7 +16,13 @@ interface FileShareDialogProps {
   fileId: string;
   file: Pick<
     FileMetaRecord,
-    "id" | "displayName" | "visibility" | "guestAccess" | "isMentionRestricted" | "ownerId" | "isReadOnly"
+    | "id"
+    | "displayName"
+    | "visibility"
+    | "guestAccess"
+    | "isMentionRestricted"
+    | "ownerId"
+    | "isReadOnly"
   >;
   currentUserRole: string;
   currentUserId: string;
@@ -38,10 +44,11 @@ export function FileShareDialog({
 }: FileShareDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader className="border-b pb-3 mb-4">
           <DialogTitle className="text-base font-semibold flex items-center gap-2">
-            <Share2 className="size-4 text-primary" /> Share File: {file.displayName}
+            <Share2 className="size-4 text-primary" /> Share File:{" "}
+            {file.displayName}
           </DialogTitle>
         </DialogHeader>
 

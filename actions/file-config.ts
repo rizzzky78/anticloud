@@ -124,6 +124,49 @@ export async function recoverFile(payload: unknown) {
   return { fileId };
 }
 
+/**
+ * Restore a soft-deleted file the caller owns (or holds an ADMIN/SUPERADMIN
+ * grant on), within the 30-day grace window. This is the user-facing recycle
+ * bin counterpart to `recoverFile` (which is SUPERADMIN-only and unscoped).
+ */
+export async function restoreFile(payload: unknown) {
+  const session = await getCurrentUser();
+  if (!session) throw AppError.unauthorized();
+
+  const { fileId } = fileIdSchema.parse(payload);
+  // Write access is required; allow operating on the soft-deleted row.
+  const file = await assertWriteAccess(session.user as SessionUser, fileId, {
+    allowSoftDeleted: true,
+  });
+
+  if (!file.deletedAt) {
+    // Already active — idempotent success.
+    return { fileId };
+  }
+
+  const elapsed = Date.now() - file.deletedAt.getTime();
+  if (elapsed > GRACE_WINDOW_MS) {
+    throw AppError.badRequest(
+      "Recovery window has expired (30-day grace period). File must be restored from backup.",
+    );
+  }
+
+  await db.file.update({
+    where: { id: fileId },
+    data: { deletedAt: null },
+  });
+
+  await bustFileMeta(fileId);
+  // Re-evaluate access now that the file is live again.
+  await invalidatePermCache(null, fileId);
+  await recordAudit({
+    action: "file.restore",
+    targetType: "file",
+    targetId: fileId,
+  });
+  return { fileId };
+}
+
 // ─── 5.2 — Permanent presigned URL token ─────────────────────────────────────
 
 /**

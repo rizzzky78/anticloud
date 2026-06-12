@@ -24,9 +24,11 @@ export default async function AppLayout({
     >
       <JobsProvider>
         <AppSidebar user={session.user} />
-        <SidebarInset>
+        <SidebarInset className="bg-[#f8f9fa] dark:bg-zinc-900 flex flex-col min-h-screen">
           <SiteHeader />
-          <div className="flex flex-1 flex-col">{children}</div>
+          <div className="flex flex-1 flex-col">
+            <div className="flex-1 flex flex-col p-6">{children}</div>
+          </div>
         </SidebarInset>
       </JobsProvider>
     </SidebarProvider>

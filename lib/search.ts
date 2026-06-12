@@ -93,58 +93,90 @@ export async function searchFiles(
   // we can use a raw query or Prisma's filter capabilities.
   // We will use Prisma's `findMany` and pass the raw query for the tsvector part if a query exists.
   
-  // Clean up the query for tsquery (replace spaces with & for a simple AND search)
-  const cleanQuery = query.trim().split(/\s+/).filter(Boolean).join(' & ');
+  // Normalize the user query. We support free text plus `#tag` / `@mention`
+  // sigils — the sigils are stripped here because their content is already
+  // folded into the file's searchVector (tags = weight B, mentions = weight C),
+  // and the `#`/`@` characters would otherwise break to_tsquery parsing.
+  const rawQuery = query.trim();
+  const terms = rawQuery
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => t.replace(/^[#@]+/, '')) // drop tag/mention sigils
+    .map((t) => t.replace(/[^\p{L}\p{N}_]+/gu, '')) // strip tsquery operators
+    .filter(Boolean);
+
+  // Prefix-match every term (`war` → `war:*`) and AND them together, so a
+  // multi-word query like "war takjil" matches files containing both prefixes.
+  const tsQuery = terms.map((t) => `${t}:*`).join(' & ');
+
+  // Escape LIKE wildcards in the raw query for the filename substring fallback.
+  const ilikePattern = `%${rawQuery.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
 
   let rawFiles: any[];
 
-  if (cleanQuery) {
-    // If there is a text query, we MUST use raw SQL because Prisma lacks native tsvector search.
-    // We will select IDs matching the criteria, then fetch metadata via Prisma or build it manually.
-    
-    let baseSql = `
-      SELECT id FROM "file"
-      WHERE "id" = ANY($1::text[])
-        AND "searchVector" @@ to_tsquery('english', $2)
-        AND "deletedAt" IS NULL
-        AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
-    `;
-    const params: any[] = [permittedFileIds, cleanQuery + ':*']; // :* for prefix matching
-    let paramIndex = 3;
+  if (rawQuery) {
+    // Text query → raw SQL (Prisma has no native tsvector support). We match on
+    // either the FTS vector OR a filename substring, so partial/odd-tokenized
+    // names still surface even when full-text tokenization misses them.
+    const params: any[] = [permittedFileIds];
+    const conditions: string[] = [
+      `"id" = ANY($1::text[])`,
+      `"deletedAt" IS NULL`,
+      `("expiresAt" IS NULL OR "expiresAt" > NOW())`,
+    ];
+    let paramIndex = 2;
+
+    const ilikeIndex = paramIndex++;
+    params.push(ilikePattern);
+
+    let tsIndex: number | null = null;
+    if (tsQuery) {
+      tsIndex = paramIndex++;
+      params.push(tsQuery);
+      conditions.push(
+        `("searchVector" @@ to_tsquery('english', $${tsIndex}) OR "displayName" ILIKE $${ilikeIndex})`
+      );
+    } else {
+      // Query was only sigils/punctuation — fall back to filename substring.
+      conditions.push(`"displayName" ILIKE $${ilikeIndex}`);
+    }
 
     if (filters.uploaderId) {
-      baseSql += ` AND "ownerId" = $${paramIndex++}`;
+      conditions.push(`"ownerId" = $${paramIndex++}`);
       params.push(filters.uploaderId);
     }
 
     if (filters.mimeType) {
-      baseSql += ` AND "mimeType" = $${paramIndex++}`;
+      conditions.push(`"mimeType" = $${paramIndex++}`);
       params.push(filters.mimeType);
     }
 
     if (filters.dateRange?.start) {
-      baseSql += ` AND "createdAt" >= $${paramIndex++}::timestamp`;
+      conditions.push(`"createdAt" >= $${paramIndex++}::timestamp`);
       params.push(filters.dateRange.start);
     }
 
     if (filters.dateRange?.end) {
-      baseSql += ` AND "createdAt" <= $${paramIndex++}::timestamp`;
+      conditions.push(`"createdAt" <= $${paramIndex++}::timestamp`);
       params.push(filters.dateRange.end);
     }
 
-    // We can filter tags by joining or by doing a subquery. Since filters.tags might be an array:
     if (filters.tags && filters.tags.length > 0) {
       for (const tag of filters.tags) {
-        baseSql += ` AND EXISTS (
-          SELECT 1 FROM file_tag ft 
-          JOIN tag t ON ft."tagId" = t.id 
+        conditions.push(`EXISTS (
+          SELECT 1 FROM file_tag ft
+          JOIN tag t ON ft."tagId" = t.id
           WHERE ft."fileId" = "file".id AND t.value = $${paramIndex++}
-        )`;
+        )`);
         params.push(tag);
       }
     }
 
-    baseSql += ` ORDER BY ts_rank("searchVector", to_tsquery('english', $2)) DESC LIMIT 50`;
+    let baseSql = `SELECT id FROM "file" WHERE ${conditions.join(' AND ')}`;
+    baseSql += tsIndex
+      ? ` ORDER BY ts_rank("searchVector", to_tsquery('english', $${tsIndex})) DESC, "createdAt" DESC LIMIT 50`
+      : ` ORDER BY "createdAt" DESC LIMIT 50`;
 
     const result = await db.$queryRawUnsafe<{ id: string }[]>(baseSql, ...params);
     const matchingIds = result.map((r) => r.id);
@@ -195,7 +227,7 @@ export async function searchFiles(
         tags: { include: { tag: true } },
       },
       orderBy: { createdAt: 'desc' },
-      limit: 50,
+      take: 50,
     } as any);
   }
 

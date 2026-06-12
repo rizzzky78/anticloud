@@ -9,7 +9,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FolderIcon, UploadCloud, Download } from "lucide-react";
+import {
+  FolderIcon,
+  UploadCloud,
+  Download,
+  List,
+  LayoutGrid,
+} from "lucide-react";
 import { FileBucket, FileListEntry } from "@/lib/file-list";
 import { FileRow } from "@/components/file-row";
 import { EmptyState } from "@/components/empty-state";
@@ -19,6 +25,7 @@ import { UploadDialog } from "@/components/upload-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useJobs } from "@/components/jobs-context";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface FileListProps {
   buckets?: FileBucket[];
@@ -43,6 +50,7 @@ export function FileList({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDownloading, setIsDownloading] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const { addJob } = useJobs();
 
   const handleSelectChange = (fileId: string, checked: boolean) => {
@@ -78,7 +86,9 @@ export function FileList({
   const handleBulkDownload = async () => {
     if (selectedIds.size === 0) return;
     setIsDownloading(true);
-    const toastId = toast.loading(`Preparing bulk download for ${selectedIds.size} files...`);
+    const toastId = toast.loading(
+      `Preparing bulk download for ${selectedIds.size} files...`,
+    );
 
     try {
       const res = await fetch("/api/files/bulk-download", {
@@ -135,10 +145,17 @@ export function FileList({
   };
 
   const buckets = files
-    ? [{ key: "results", label: `Search Results (${files.length})`, files: files as any }]
+    ? [
+        {
+          key: "results",
+          label: `Search Results (${files.length})`,
+          files: files as any,
+        },
+      ]
     : propBuckets;
 
-  const hasContent = buckets.some((b) => b.files.length > 0) || subfolders.length > 0;
+  const hasContent =
+    buckets.some((b) => b.files.length > 0) || subfolders.length > 0;
 
   const handleSuccess = () => {
     router.refresh();
@@ -149,7 +166,11 @@ export function FileList({
       <div className="flex flex-col items-center justify-center flex-1 py-12">
         <EmptyState
           icon={<FolderIcon className="size-10 text-muted-foreground" />}
-          title={currentFolderPath === "/" ? "No files yet" : `No files in ${getFolderName(currentFolderPath)}`}
+          title={
+            currentFolderPath === "/"
+              ? "No files yet"
+              : `No files in ${getFolderName(currentFolderPath)}`
+          }
           description="Upload a file or create a folder to get started."
         >
           <Button onClick={() => setIsUploadOpen(true)} className="mt-4 gap-2">
@@ -168,7 +189,38 @@ export function FileList({
   }
 
   return (
-    <div className="flex flex-col gap-8 w-full">
+    <div className="flex flex-col gap-6 w-full">
+      {/* Google Drive style view toggle toolbar */}
+      <div className="flex items-center justify-between pb-3">
+        <div className="text-sm font-medium text-muted-foreground">
+          <span>
+            {currentFolderPath === "/"
+              ? "My Drive"
+              : getFolderName(currentFolderPath)}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 py-2 px-2 bg-muted rounded-full">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="icon-sm"
+            onClick={() => setViewMode("list")}
+            className="size-8 rounded-full cursor-pointer hover:bg-muted"
+            title="List view"
+          >
+            <List className="size-4" />
+          </Button>
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="icon-sm"
+            onClick={() => setViewMode("grid")}
+            className="size-8 rounded-full cursor-pointer hover:bg-muted"
+            title="Grid view"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+        </div>
+      </div>
+
       {/* Folders Section */}
       {subfolders.length > 0 && (
         <div className="flex flex-col gap-3">
@@ -182,12 +234,15 @@ export function FileList({
                 <Link
                   key={path}
                   href={`/files?folderPath=${encodeURIComponent(path)}`}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-accent/40 active:bg-accent/60 transition-colors shadow-sm"
+                  className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-muted/40 active:bg-muted/60 transition-colors shadow-sm"
                 >
-                  <div className="p-2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <div className="p-2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200/50 dark:border-zinc-700/50">
                     <FolderIcon className="size-4 shrink-0" />
                   </div>
-                  <span className="text-sm font-medium truncate" title={folderName}>
+                  <span
+                    className="text-sm font-medium truncate"
+                    title={folderName}
+                  >
                     {folderName}
                   </span>
                 </Link>
@@ -205,43 +260,76 @@ export function FileList({
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               {bucket.label}
             </h2>
-            <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[40px] p-4 py-3">
-                      <Checkbox
-                        checked={
-                          bucket.files.length > 0 &&
-                          bucket.files.every((f: any) => selectedIds.has(f.id))
+            {viewMode === "list" ? (
+              <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[40px] p-4 py-3">
+                        <Checkbox
+                          checked={
+                            bucket.files.length > 0 &&
+                            bucket.files.every((f: any) =>
+                              selectedIds.has(f.id),
+                            )
+                          }
+                          onCheckedChange={(checked) =>
+                            handleSelectAll(bucket.files, !!checked)
+                          }
+                          aria-label="Select all files in this section"
+                        />
+                      </TableHead>
+                      <TableHead className="w-[45%] p-4 py-3">Name</TableHead>
+                      <TableHead className="hidden sm:table-cell py-3">
+                        Size
+                      </TableHead>
+                      <TableHead className="hidden md:table-cell py-3">
+                        Access
+                      </TableHead>
+                      <TableHead className="hidden lg:table-cell py-3">
+                        Created
+                      </TableHead>
+                      <TableHead className="w-[10%] py-3 text-right p-4"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bucket.files.map((file: FileListEntry) => (
+                      <FileRow
+                        key={file.id}
+                        file={file}
+                        userId={userId}
+                        userRole={userRole}
+                        folderPaths={folderPaths}
+                        onSuccess={handleSuccess}
+                        isSelected={selectedIds.has(file.id)}
+                        onSelectChange={(checked) =>
+                          handleSelectChange(file.id, checked)
                         }
-                        onCheckedChange={(checked) => handleSelectAll(bucket.files, !!checked)}
-                        aria-label="Select all files in this section"
+                        viewMode="list"
                       />
-                    </TableHead>
-                    <TableHead className="w-[45%] p-4 py-3">Name</TableHead>
-                    <TableHead className="hidden sm:table-cell py-3">Size</TableHead>
-                    <TableHead className="hidden md:table-cell py-3">Access</TableHead>
-                    <TableHead className="hidden lg:table-cell py-3">Created</TableHead>
-                    <TableHead className="w-[10%] py-3 text-right p-4"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bucket.files.map((file: FileListEntry) => (
-                    <FileRow
-                      key={file.id}
-                      file={file}
-                      userId={userId}
-                      userRole={userRole}
-                      folderPaths={folderPaths}
-                      onSuccess={handleSuccess}
-                      isSelected={selectedIds.has(file.id)}
-                      onSelectChange={(checked) => handleSelectChange(file.id, checked)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {bucket.files.map((file: FileListEntry) => (
+                  <FileRow
+                    key={file.id}
+                    file={file}
+                    userId={userId}
+                    userRole={userRole}
+                    folderPaths={folderPaths}
+                    onSuccess={handleSuccess}
+                    isSelected={selectedIds.has(file.id)}
+                    onSelectChange={(checked) =>
+                      handleSelectChange(file.id, checked)
+                    }
+                    viewMode="grid"
+                  />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
@@ -258,7 +346,8 @@ export function FileList({
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-background/85 dark:bg-card/85 backdrop-blur-md px-6 py-3.5 rounded-full border shadow-xl animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-foreground">
-              {selectedIds.size} {selectedIds.size === 1 ? "file" : "files"} selected
+              {selectedIds.size} {selectedIds.size === 1 ? "file" : "files"}{" "}
+              selected
             </span>
           </div>
           <div className="h-4 w-px bg-border" />
@@ -296,4 +385,3 @@ export function FileList({
     </div>
   );
 }
-

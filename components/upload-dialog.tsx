@@ -494,7 +494,7 @@ export function UploadDialog({
                         )}
 
                         {item.status === "success" && (
-                          <div className="flex items-center text-xs text-emerald-600 dark:text-emerald-400 gap-1">
+                          <div className="flex items-center text-xs text-zinc-600 dark:text-zinc-400 gap-1">
                             <CheckCircle2 className="size-3.5" /> Complete
                           </div>
                         )}

@@ -11,7 +11,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Field, FieldLabel, FieldDescription } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,7 +25,15 @@ import {
   generatePermanentToken,
   revokePermanentToken,
 } from "@/actions/file-config";
-import { CalendarIcon, Link2, Copy, Check, RotateCw, XCircle, AlertCircle } from "lucide-react";
+import {
+  CalendarIcon,
+  Link2,
+  Copy,
+  Check,
+  RotateCw,
+  XCircle,
+  AlertCircle,
+} from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { FileMetaRecord } from "@/lib/file-meta";
@@ -29,7 +41,12 @@ import { FileMetaRecord } from "@/lib/file-meta";
 interface FileConfigPanelProps {
   file: Pick<
     FileMetaRecord,
-    "id" | "displayName" | "isReadOnly" | "isMentionRestricted" | "permanentUrlToken" | "expiresAt"
+    | "id"
+    | "displayName"
+    | "isReadOnly"
+    | "isMentionRestricted"
+    | "permanentUrlToken"
+    | "expiresAt"
   >;
   userRole: string;
   isOpen: boolean;
@@ -45,13 +62,17 @@ export function FileConfigPanel({
   onSuccess,
 }: FileConfigPanelProps) {
   const [isReadOnlyState, setIsReadOnlyState] = useState(file.isReadOnly);
-  const [isMentionRestrictedState, setIsMentionRestrictedState] = useState(file.isMentionRestricted);
-  const [permanentToken, setPermanentToken] = useState<string | null>(file.permanentUrlToken);
+  const [isMentionRestrictedState, setIsMentionRestrictedState] = useState(
+    file.isMentionRestricted,
+  );
+  const [permanentToken, setPermanentToken] = useState<string | null>(
+    file.permanentUrlToken,
+  );
   const [permanentUrl, setPermanentUrl] = useState<string | null>(null);
   const [expiryDate, setExpiryDate] = useState<Date | undefined>(
-    file.expiresAt ? new Date(file.expiresAt) : undefined
+    file.expiresAt ? new Date(file.expiresAt) : undefined,
   );
-  
+
   const [copied, setCopied] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -65,10 +86,12 @@ export function FileConfigPanel({
       setPermanentToken(file.permanentUrlToken);
       setExpiryDate(file.expiresAt ? new Date(file.expiresAt) : undefined);
       setCopied(false);
-      
+
       if (file.permanentUrlToken) {
         // Approximate URL derivation (it will also resolve properly from generator)
-        setPermanentUrl(`${window.location.origin}/api/files/p/${file.permanentUrlToken}`);
+        setPermanentUrl(
+          `${window.location.origin}/api/files/p/${file.permanentUrlToken}`,
+        );
       } else {
         setPermanentUrl(null);
       }
@@ -98,7 +121,9 @@ export function FileConfigPanel({
     startTransition(async () => {
       try {
         await setReadOnly({ fileId: file.id, isReadOnly: checked });
-        toast.success(checked ? "File set to read-only" : "File read-only flag lifted");
+        toast.success(
+          checked ? "File set to read-only" : "File read-only flag lifted",
+        );
         onSuccess();
       } catch (err: any) {
         toast.error(err?.message || "Failed to toggle read-only");
@@ -111,8 +136,15 @@ export function FileConfigPanel({
     setIsMentionRestrictedState(checked);
     startTransition(async () => {
       try {
-        await setMentionRestricted({ fileId: file.id, isMentionRestricted: checked });
-        toast.success(checked ? "File access gated by mentions" : "File access gating removed");
+        await setMentionRestricted({
+          fileId: file.id,
+          isMentionRestricted: checked,
+        });
+        toast.success(
+          checked
+            ? "File access gated by mentions"
+            : "File access gating removed",
+        );
         onSuccess();
       } catch (err: any) {
         toast.error(err?.message || "Failed to toggle mention restriction");
@@ -162,10 +194,10 @@ export function FileConfigPanel({
     if (!expiryDate) return null;
     const diff = expiryDate.getTime() - Date.now();
     if (diff <= 0) return "Expired";
-    
+
     const days = Math.floor(diff / (24 * 3600 * 1000));
     if (days > 0) return `expires in ${days}d`;
-    
+
     const hours = Math.floor(diff / (3600 * 1000));
     if (hours > 0) return `expires in ${hours}h`;
 
@@ -177,19 +209,21 @@ export function FileConfigPanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md overflow-y-auto">
-        <SheetHeader>
+      <SheetContent className="sm:max-w-lg overflow-y-auto">
+        <SheetHeader className="mt-6">
           <SheetTitle>Lifecycle Configuration</SheetTitle>
           <SheetDescription>
-            Configure file access restrictions, read-only modes, and automatic expiration.
+            Configure file access restrictions, read-only modes, and automatic
+            expiration.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="space-y-6 py-6">
+        <div className="space-y-6 p-6">
           {/* Expiry Date (TTL) */}
           <div className="space-y-2">
             <label className="text-sm font-semibold flex items-center gap-1.5">
-              <CalendarIcon className="size-4 text-muted-foreground" /> Auto Expiration (TTL)
+              <CalendarIcon className="size-4 text-muted-foreground" /> Auto
+              Expiration (TTL)
             </label>
             <div className="flex items-center gap-2">
               <Popover>
@@ -200,7 +234,11 @@ export function FileConfigPanel({
                     disabled={isPending}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {expiryDate ? format(expiryDate, "PPP") : <span>No expiration</span>}
+                    {expiryDate ? (
+                      format(expiryDate, "PPP")
+                    ) : (
+                      <span>No expiration</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -209,7 +247,6 @@ export function FileConfigPanel({
                     selected={expiryDate}
                     onSelect={handleTTLChange}
                     disabled={(date) => date < new Date()}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
@@ -228,7 +265,11 @@ export function FileConfigPanel({
             </div>
             {expiryDate && countdownText && (
               <div className="mt-1">
-                <Badge variant={countdownText === "Expired" ? "destructive" : "secondary"}>
+                <Badge
+                  variant={
+                    countdownText === "Expired" ? "destructive" : "secondary"
+                  }
+                >
                   {countdownText}
                 </Badge>
               </div>
@@ -241,11 +282,15 @@ export function FileConfigPanel({
           {/* Read Only Toggle */}
           <div className="flex items-start justify-between rounded-lg border p-4">
             <div className="space-y-0.5 mr-4">
-              <label className="text-sm font-semibold" htmlFor="readonly-switch">
+              <label
+                className="text-sm font-semibold"
+                htmlFor="readonly-switch"
+              >
                 Read-Only Mode
               </label>
               <p className="text-xs text-muted-foreground leading-normal mt-1">
-                Prevents file renaming, moving, and binary replacements by non-superadmins.
+                Prevents file renaming, moving, and binary replacements by
+                non-superadmins.
               </p>
             </div>
             <Switch
@@ -259,11 +304,15 @@ export function FileConfigPanel({
           {/* Mention Restricted Toggle */}
           <div className="flex items-start justify-between rounded-lg border p-4">
             <div className="space-y-0.5 mr-4">
-              <label className="text-sm font-semibold" htmlFor="mention-restricted-switch">
+              <label
+                className="text-sm font-semibold"
+                htmlFor="mention-restricted-switch"
+              >
                 Mention-Restricted Gating
               </label>
               <p className="text-xs text-muted-foreground leading-normal mt-1">
-                If checked, users without explicit permission grants must be explicitly @mentioned in the file to view it.
+                If checked, users without explicit permission grants must be
+                explicitly @mentioned in the file to view it.
               </p>
             </div>
             <Switch
@@ -277,10 +326,12 @@ export function FileConfigPanel({
           {/* Permanent Link generation */}
           <div className="rounded-lg border p-4 space-y-3">
             <label className="text-sm font-semibold flex items-center gap-1.5">
-              <Link2 className="size-4 text-muted-foreground" /> Permanent Public URL
+              <Link2 className="size-4 text-muted-foreground" /> Permanent
+              Public URL
             </label>
             <p className="text-xs text-muted-foreground leading-normal">
-              Generate a unique permanent URL for viewing/downloading the file. Only active while the file visibility is PUBLIC.
+              Generate a unique permanent URL for viewing/downloading the file.
+              Only active while the file visibility is PUBLIC.
             </p>
 
             {permanentUrl ? (
@@ -294,7 +345,11 @@ export function FileConfigPanel({
                     onClick={copyToClipboard}
                     title="Copy URL"
                   >
-                    {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                    {copied ? (
+                      <Check className="size-3.5 text-foreground" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
                   </Button>
                 </div>
                 <div className="flex gap-2">
@@ -332,10 +387,12 @@ export function FileConfigPanel({
           </div>
 
           {file.isReadOnly && !isSuperadmin && (
-            <div className="flex items-start gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-600 dark:text-amber-400">
+            <div className="flex items-start gap-2 rounded-lg bg-zinc-50 border border-zinc-200 p-3 text-xs text-zinc-600 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-400">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold">File is Read-only:</span> You can configure lifecycle settings, but file content mutations are locked.
+                <span className="font-semibold">File is Read-only:</span> You
+                can configure lifecycle settings, but file content mutations are
+                locked.
               </div>
             </div>
           )}

@@ -39,25 +39,25 @@ export function JobsDrawer() {
         );
       case "RUNNING":
         return (
-          <Badge variant="default" className="bg-sky-600 hover:bg-sky-600 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 animate-pulse">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 animate-pulse bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             <Activity className="size-3" /> Running
           </Badge>
         );
       case "COMPLETED":
         return (
-          <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 bg-zinc-50 border-zinc-200 text-zinc-700 dark:bg-zinc-900/50 dark:border-zinc-800 dark:text-zinc-300">
             <CheckCircle className="size-3" /> Completed
           </Badge>
         );
       case "FAILED":
         return (
-          <Badge variant="destructive" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-400">
             <XCircle className="size-3" /> Failed
           </Badge>
         );
       case "DEAD_LETTER":
         return (
-          <Badge variant="destructive" className="bg-rose-950 hover:bg-rose-950 text-rose-200 border-rose-800 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 border-zinc-400 text-zinc-800 bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:bg-zinc-900">
             <AlertOctagon className="size-3" /> DLQ
           </Badge>
         );
@@ -160,7 +160,7 @@ export function JobsDrawer() {
 
                   {/* Failed log details */}
                   {(job.status === "FAILED" || job.status === "DEAD_LETTER") && job.error && (
-                    <div className="flex items-start gap-1.5 p-2 rounded bg-destructive/10 border border-destructive/20 text-destructive text-[10px] font-mono">
+                    <div className="flex items-start gap-1.5 p-2 rounded bg-zinc-50 border border-zinc-200 text-zinc-600 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-400 text-[10px] font-mono">
                       <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
                       <p className="line-clamp-2 leading-relaxed" title={job.error}>
                         {job.error}

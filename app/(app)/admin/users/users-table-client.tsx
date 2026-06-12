@@ -86,14 +86,14 @@ export function UsersTableClient({
     switch (role) {
       case "SUPERADMIN":
         return (
-          <Badge variant="destructive" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider">
-            <ShieldAlert className="size-3" /> Superadmin
+          <Badge variant="outline" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-400 text-zinc-900 bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:bg-zinc-900">
+            <ShieldAlert className="size-3 text-zinc-500" /> Superadmin
           </Badge>
         );
       case "ADMIN":
         return (
-          <Badge variant="default" className="bg-amber-600 hover:bg-amber-600 gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider">
-            <ShieldCheck className="size-3" /> Admin
+          <Badge variant="outline" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50">
+            <ShieldCheck className="size-3 text-zinc-500" /> Admin
           </Badge>
         );
       case "VIEWER":
@@ -284,13 +284,13 @@ export function UsersTableClient({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <Shield className="size-5 text-amber-600" />
+              <Shield className="size-5 text-zinc-500" />
               Confirm Role Change
             </AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to change <strong>{pendingChange?.userName}</strong>'s role
               from <strong className="uppercase">{pendingChange?.oldRole}</strong> to{" "}
-              <strong className="uppercase text-amber-700">{pendingChange?.newRole}</strong>?
+              <strong className="uppercase text-foreground font-bold">{pendingChange?.newRole}</strong>?
               <br />
               This will update their system-wide access permissions immediately.
             </AlertDialogDescription>
@@ -300,7 +300,7 @@ export function UsersTableClient({
             <AlertDialogAction
               onClick={confirmRoleChange}
               disabled={isPending}
-              className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-1.5 cursor-pointer"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 cursor-pointer"
             >
               {isPending && <Loader2 className="size-4 animate-spin" />}
               Confirm Change

@@ -74,7 +74,7 @@ export function SearchCommand({ open, onOpenChange }: SearchCommandProps) {
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} title="Search Files" description="Quick search files by name, tags, or notes...">
+    <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false} title="Search Files" description="Quick search files by name, tags, or notes...">
       <CommandInput
         placeholder="Type to search files, tags, or mentions..."
         value={query}

@@ -66,6 +66,11 @@ import { FileTags } from "@/components/file-tags";
 import { FileMentions } from "@/components/file-mentions";
 import { FileNotePanel } from "@/components/file-note-panel";
 import { TextFilePreview } from "@/components/text-file-preview";
+import {
+  ImageViewer,
+  VideoPlayer,
+  AudioPlayer,
+} from "@/components/file-media-viewer";
 import { NoteHistoryDialog } from "@/components/note-history";
 import { FileSharingPanel } from "@/components/file-sharing-panel";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
@@ -144,12 +149,17 @@ export function FileDetailClient({
 
   // Check if previewable
   const isImage = file.mimeType.startsWith("image/");
+  const isVideo = file.mimeType.startsWith("video/");
+  const isAudio = file.mimeType.startsWith("audio/");
   const isPdf = file.mimeType === "application/pdf";
   const isText =
     file.mimeType.startsWith("text/") ||
     file.mimeType === "application/json" ||
     file.mimeType === "application/javascript";
-  const isPreviewable = isImage || isPdf || isText;
+  const isPreviewable = isImage || isVideo || isAudio || isPdf || isText;
+
+  // Stable streaming endpoint for media — honors Range requests for seeking.
+  const fileSrc = `/api/files/${file.id}`;
 
   // Note history view restricted to owner and admin/superadmin
   const canViewNoteHistory =
@@ -197,7 +207,9 @@ export function FileDetailClient({
         description: "You can track the job progress in your tasks console.",
       });
     } catch (err: any) {
-      toast.error(err.message || "Failed to start compression", { id: toastId });
+      toast.error(err.message || "Failed to start compression", {
+        id: toastId,
+      });
     } finally {
       setIsCompressing(false);
     }
@@ -217,7 +229,11 @@ export function FileDetailClient({
     }
   };
 
-  const wrapWithTooltip = (element: React.ReactNode, disabled: boolean, reason: string) => {
+  const wrapWithTooltip = (
+    element: React.ReactNode,
+    disabled: boolean,
+    reason: string,
+  ) => {
     if (!disabled) return element;
     return (
       <TooltipProvider>
@@ -245,16 +261,19 @@ export function FileDetailClient({
   const expiresText = getExpiresText();
 
   return (
-    <div className="flex flex-col flex-1 gap-6 p-6 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col flex-1 gap-6 mx-auto w-full">
       {/* Soft deleted warning banner */}
       {isSoftDeleted && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-zinc-50 border border-zinc-200 text-zinc-600 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-400">
           <div className="flex items-start gap-3">
             <AlertTriangle className="size-5 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm">This file is in the Recycle Bin</p>
-              <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-0.5">
-                Deleted on {new Date(file.deletedAt!).toLocaleDateString()} (Grace period: 30 days before permanent wipe).
+              <p className="font-semibold text-sm">
+                This file is in the Recycle Bin
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-0.5">
+                Deleted on {new Date(file.deletedAt!).toLocaleDateString()}{" "}
+                (Grace period: 30 days before permanent wipe).
               </p>
             </div>
           </div>
@@ -262,7 +281,7 @@ export function FileDetailClient({
             <Button
               variant="outline"
               size="sm"
-              className="border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-700 dark:hover:text-amber-300"
+              className="border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-zinc-800 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               onClick={handleRecover}
               disabled={isPending}
             >
@@ -278,10 +297,12 @@ export function FileDetailClient({
           href={`/files?folderPath=${encodeURIComponent(file.folderPath)}`}
           className="flex items-center gap-1.5 hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="size-4" /> Back to Files
+          <ArrowLeft className="size-3" /> Back to Files
         </Link>
         <ChevronRight className="size-3 text-muted-foreground/50" />
-        <span className="font-mono text-xs truncate max-w-xs">{file.folderPath}</span>
+        <span className="font-mono text-xs truncate max-w-xs">
+          {file.folderPath}
+        </span>
       </div>
 
       {/* Detail Header */}
@@ -292,17 +313,25 @@ export function FileDetailClient({
               <FileIconComponent className="size-6 shrink-0" />
             </div>
             <div className="space-y-1 min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight truncate pr-4" title={file.displayName}>
+              <h1
+                className="text-2xl font-bold tracking-tight truncate pr-4"
+                title={file.displayName}
+              >
                 {file.displayName}
               </h1>
-              <p className="text-xs text-muted-foreground font-mono truncate">{file.id}</p>
+              <p className="text-xs text-muted-foreground font-mono truncate">
+                {file.id}
+              </p>
             </div>
           </div>
 
           {/* Badges row */}
           <div className="flex flex-wrap gap-2">
             {file.visibility === "PUBLIC" ? (
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none"
+              >
                 <Globe className="size-3 mr-1" /> Public
               </Badge>
             ) : (
@@ -311,22 +340,34 @@ export function FileDetailClient({
               </Badge>
             )}
             {file.visibility === "PUBLIC" && file.guestAccess && (
-              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none"
+              >
                 Guest Access
               </Badge>
             )}
             {file.isReadOnly && (
-              <Badge variant="destructive" className="bg-destructive/10 text-destructive border-none">
+              <Badge
+                variant="outline"
+                className="border-zinc-300 text-zinc-700 bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:bg-zinc-900/50"
+              >
                 Read-only
               </Badge>
             )}
             {file.isMentionRestricted && (
-              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none"
+              >
                 Gated
               </Badge>
             )}
             {expiresText && (
-              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 dark:text-blue-400 border-none">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none"
+              >
                 <Calendar className="size-3 mr-1" /> {expiresText}
               </Badge>
             )}
@@ -359,28 +400,37 @@ export function FileDetailClient({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 {wrapWithTooltip(
-                  <DropdownMenuItem onClick={() => setIsRenameOpen(true)} disabled={isMutateDisabled}>
+                  <DropdownMenuItem
+                    onClick={() => setIsRenameOpen(true)}
+                    disabled={isMutateDisabled}
+                  >
                     <Edit2 className="size-4 mr-2" /> Rename
                   </DropdownMenuItem>,
                   isMutateDisabled,
-                  "File is read-only"
+                  "File is read-only",
                 )}
                 {wrapWithTooltip(
-                  <DropdownMenuItem onClick={() => setIsMoveOpen(true)} disabled={isMutateDisabled}>
+                  <DropdownMenuItem
+                    onClick={() => setIsMoveOpen(true)}
+                    disabled={isMutateDisabled}
+                  >
                     <FolderInput className="size-4 mr-2" /> Move
                   </DropdownMenuItem>,
                   isMutateDisabled,
-                  "File is read-only"
+                  "File is read-only",
                 )}
                 <DropdownMenuItem onClick={() => setIsVisibilityOpen(true)}>
                   <Eye className="size-4 mr-2" /> Visibility
                 </DropdownMenuItem>
                 {wrapWithTooltip(
-                  <DropdownMenuItem onClick={() => setIsReplaceOpen(true)} disabled={isMutateDisabled}>
+                  <DropdownMenuItem
+                    onClick={() => setIsReplaceOpen(true)}
+                    disabled={isMutateDisabled}
+                  >
                     <RefreshCw className="size-4 mr-2" /> Replace Binary
                   </DropdownMenuItem>,
                   isMutateDisabled,
-                  "File is read-only"
+                  "File is read-only",
                 )}
                 <DropdownMenuSeparator />
                 {wrapWithTooltip(
@@ -392,7 +442,7 @@ export function FileDetailClient({
                     <Trash2 className="size-4 mr-2" /> Delete File
                   </DropdownMenuItem>,
                   isMutateDisabled,
-                  "File is read-only"
+                  "File is read-only",
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -420,25 +470,29 @@ export function FileDetailClient({
                     File Preview
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-4 bg-muted/10 flex flex-col justify-center min-h-[300px]">
+                <CardContent className="p-4 flex flex-col justify-center min-h-[300px]">
                   {isSoftDeleted ? (
                     <div className="flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
-                      <AlertTriangle className="size-10 text-amber-500 mb-2" />
+                      <AlertTriangle className="size-10 text-zinc-400 mb-2" />
                       <p className="text-sm font-medium">Preview Unavailable</p>
-                      <p className="text-xs mt-1">This file is currently in the recycle bin.</p>
+                      <p className="text-xs mt-1">
+                        This file is currently in the recycle bin.
+                      </p>
                     </div>
                   ) : isPreviewable ? (
                     <div className="w-full flex justify-center">
                       {isImage && (
-                        <img
-                          src={`/api/files/${file.id}`}
-                          alt={file.displayName}
-                          className="max-w-full max-h-[500px] object-contain rounded-lg border shadow-xs bg-checkered"
-                        />
+                        <ImageViewer src={fileSrc} alt={file.displayName} />
+                      )}
+                      {isVideo && (
+                        <VideoPlayer src={fileSrc} alt={file.displayName} />
+                      )}
+                      {isAudio && (
+                        <AudioPlayer src={fileSrc} alt={file.displayName} />
                       )}
                       {isPdf && (
                         <iframe
-                          src={`/api/files/${file.id}#toolbar=0`}
+                          src={`${fileSrc}#toolbar=0`}
                           className="w-full h-[600px] rounded-lg border shadow-xs"
                           title="PDF Preview"
                         />
@@ -448,8 +502,12 @@ export function FileDetailClient({
                   ) : (
                     <div className="flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
                       <FileIconComponent className="size-16 text-muted-foreground/30 mb-3" />
-                      <p className="text-sm font-medium">No Preview Available</p>
-                      <p className="text-xs mt-1">Downloading this file is recommended for viewing.</p>
+                      <p className="text-sm font-medium">
+                        No Preview Available
+                      </p>
+                      <p className="text-xs mt-1">
+                        Downloading this file is recommended for viewing.
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -461,8 +519,12 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <User className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">Owner</p>
-                      <p className="text-sm font-medium truncate">{ownerName}</p>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Owner
+                      </p>
+                      <p className="text-sm font-medium truncate">
+                        {ownerName}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -471,8 +533,12 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <HardDrive className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">Size</p>
-                      <p className="text-sm font-medium">{formatBytes(file.size)}</p>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Size
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatBytes(file.size)}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -481,8 +547,13 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <FileText className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">MIME Type</p>
-                      <p className="text-sm font-medium truncate" title={file.mimeType}>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        MIME Type
+                      </p>
+                      <p
+                        className="text-sm font-medium truncate"
+                        title={file.mimeType}
+                      >
                         {file.mimeType}
                       </p>
                     </div>
@@ -493,8 +564,12 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <Calendar className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">Created</p>
-                      <p className="text-sm font-medium">{formatRelativeDate(file.createdAt)}</p>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Created
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatRelativeDate(file.createdAt)}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -503,8 +578,12 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <Calendar className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">Last Modified</p>
-                      <p className="text-sm font-medium">{formatRelativeDate(file.updatedAt)}</p>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Last Modified
+                      </p>
+                      <p className="text-sm font-medium">
+                        {formatRelativeDate(file.updatedAt)}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -513,8 +592,13 @@ export function FileDetailClient({
                   <CardContent className="p-4 flex items-center gap-3">
                     <FolderInput className="size-4 text-muted-foreground" />
                     <div>
-                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">Virtual Path</p>
-                      <p className="text-sm font-medium truncate" title={file.folderPath}>
+                      <p className="text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Virtual Path
+                      </p>
+                      <p
+                        className="text-sm font-medium truncate"
+                        title={file.folderPath}
+                      >
                         {file.folderPath}
                       </p>
                     </div>
@@ -528,7 +612,10 @@ export function FileDetailClient({
                   <CardTitle className="text-sm font-semibold flex items-center justify-between">
                     <span>COMPRESSION & DERIVED VERSIONS</span>
                     {parentFile && (
-                      <Badge variant="outline" className="bg-purple-500/5 text-purple-600 dark:text-purple-400">
+                      <Badge
+                        variant="outline"
+                        className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300"
+                      >
                         Derived Version
                       </Badge>
                     )}
@@ -538,33 +625,58 @@ export function FileDetailClient({
                   {parentFile && (
                     <div className="flex items-center justify-between gap-4 p-3 rounded-lg border bg-muted/20">
                       <div className="space-y-0.5">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Original Source File</p>
-                        <Link href={`/files/${parentFile.id}`} className="text-sm font-medium hover:underline text-primary">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                          Original Source File
+                        </p>
+                        <Link
+                          href={`/files/${parentFile.id}`}
+                          className="text-sm font-medium hover:underline text-primary"
+                        >
                           {parentFile.displayName}
                         </Link>
-                        <p className="text-[10px] text-muted-foreground">{formatBytes(BigInt(parentFile.size))} • {parentFile.mimeType}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatBytes(parentFile.size)} • {parentFile.mimeType}
+                        </p>
                       </div>
                     </div>
                   )}
 
                   {derivatives.length > 0 && (
                     <div className="space-y-3">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Derived Versions</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Derived Versions
+                      </p>
                       <div className="space-y-2.5">
                         {derivatives.map((d) => {
                           const originalSize = BigInt(file.size);
                           const compressedSize = BigInt(d.size);
-                          const ratio = originalSize > 0 
-                            ? ((1 - Number(compressedSize) / Number(originalSize)) * 100).toFixed(0)
-                            : "0";
+                          const ratio =
+                            originalSize > 0
+                              ? (
+                                  (1 -
+                                    Number(compressedSize) /
+                                      Number(originalSize)) *
+                                  100
+                                ).toFixed(0)
+                              : "0";
                           return (
-                            <div key={d.id} className="flex items-center justify-between gap-4 p-3.5 rounded-lg border bg-card shadow-xs">
+                            <div
+                              key={d.id}
+                              className="flex items-center justify-between gap-4 p-3.5 rounded-lg border bg-card shadow-xs"
+                            >
                               <div className="min-w-0 space-y-0.5">
-                                <Link href={`/files/${d.id}`} className="text-sm font-medium hover:underline text-foreground block truncate">
+                                <Link
+                                  href={`/files/${d.id}`}
+                                  className="text-sm font-medium hover:underline text-foreground block truncate"
+                                >
                                   {d.displayName}
                                 </Link>
                                 <p className="text-[10px] text-muted-foreground">
-                                  {formatBytes(compressedSize)} • {d.mimeType} • <span className="font-semibold text-emerald-600 dark:text-emerald-400">Saved {ratio}%</span>
+                                  {formatBytes(compressedSize.toString())} •{" "}
+                                  {d.mimeType} •{" "}
+                                  <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                                    Saved {ratio}%
+                                  </span>
                                 </p>
                               </div>
                               {userCanManage && (
@@ -572,10 +684,14 @@ export function FileDetailClient({
                                   variant="outline"
                                   size="xs"
                                   onClick={() => handlePromote(d.id)}
-                                  disabled={isPromoting !== null || isCompressing}
+                                  disabled={
+                                    isPromoting !== null || isCompressing
+                                  }
                                   className="text-xs h-8 cursor-pointer shrink-0"
                                 >
-                                  {isPromoting === d.id ? "Promoting..." : "Make Canonical"}
+                                  {isPromoting === d.id
+                                    ? "Promoting..."
+                                    : "Make Canonical"}
                                 </Button>
                               )}
                             </div>
@@ -588,12 +704,21 @@ export function FileDetailClient({
                   {!parentFile && file.mimeType !== "application/gzip" && (
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
                       <div className="space-y-0.5">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Non-Destructive Gzip Compression</p>
-                        <p className="text-[11px] text-muted-foreground">Compress this file server-side to save storage space. The original file remains intact.</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">
+                          Non-Destructive Gzip Compression
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Compress this file server-side to save storage space.
+                          The original file remains intact.
+                        </p>
                       </div>
                       <Button
                         onClick={handleCompress}
-                        disabled={isCompressing || isPromoting !== null || isMutateDisabled}
+                        disabled={
+                          isCompressing ||
+                          isPromoting !== null ||
+                          isMutateDisabled
+                        }
                         className="self-start sm:self-center cursor-pointer shadow-xs gap-1.5"
                       >
                         {isCompressing ? (
@@ -620,11 +745,19 @@ export function FileDetailClient({
             <TabsContent value="notes" className="outline-hidden space-y-4">
               <div className="flex justify-between items-center bg-muted/30 border p-3 rounded-lg">
                 <div className="space-y-0.5">
-                  <h3 className="text-xs font-semibold text-foreground">Collaborative Notes</h3>
-                  <p className="text-[0.65rem] text-muted-foreground">Shared editing for this document. Ctrl+S to save.</p>
+                  <h3 className="text-xs font-semibold text-foreground">
+                    Collaborative Notes
+                  </h3>
+                  <p className="text-[0.65rem] text-muted-foreground">
+                    Shared editing for this document. Ctrl+S to save.
+                  </p>
                 </div>
                 {canViewNoteHistory && (
-                  <Button variant="outline" size="xs" onClick={() => setIsHistoryOpen(true)}>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setIsHistoryOpen(true)}
+                  >
                     <History className="size-3 mr-1.5" /> Note History
                   </Button>
                 )}
@@ -642,7 +775,8 @@ export function FileDetailClient({
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <Share2 className="size-4 text-primary" /> File Access & Sharing
+                    <Share2 className="size-4 text-primary" /> File Access &
+                    Sharing
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -662,7 +796,7 @@ export function FileDetailClient({
         </div>
 
         {/* Right Side: Collaboration Side-Panel (Tags & Mentions) */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-6 lg:mt-16">
           <Card>
             <CardHeader className="py-4 border-b">
               <CardTitle className="text-sm font-semibold flex items-center gap-1.5">
@@ -732,12 +866,15 @@ export function FileDetailClient({
               <AlertDialogHeader>
                 <AlertDialogTitle>Move file to Recycle Bin?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Are you sure you want to move &quot;{file.displayName}&quot; to the Recycle Bin?
-                  You can restore it within 30 days before it is permanently hard deleted.
+                  Are you sure you want to move &quot;{file.displayName}&quot;
+                  to the Recycle Bin? You can restore it within 30 days before
+                  it is permanently hard deleted.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+                <AlertDialogCancel disabled={isPending}>
+                  Cancel
+                </AlertDialogCancel>
                 <AlertDialogAction
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   onClick={(e) => {

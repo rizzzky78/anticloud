@@ -137,6 +137,15 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Populate the FTS searchVector so the file is findable immediately.
+        // Without this the column stays NULL until the file is later renamed/
+        // tagged/noted, and search returns nothing for freshly uploaded files.
+        const { updateSearchVector, invalidateUserSearchCache } = await import(
+          "@/lib/search"
+        );
+        await updateSearchVector(id);
+        await invalidateUserSearchCache(session.user.id);
+
         const { recordAudit } = await import("@/lib/audit");
         await recordAudit({
           actorId: session.user.id,

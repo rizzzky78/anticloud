@@ -3,9 +3,22 @@
 import { useState, useEffect, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCheck, Loader2, Bell, Inbox, AlertCircle, ArrowLeft } from "lucide-react";
+import {
+  CheckCheck,
+  Loader2,
+  Bell,
+  Inbox,
+  AlertCircle,
+  ArrowLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -50,23 +63,26 @@ export default function NotificationsPage() {
   }, []);
 
   // Fetch initial notifications
-  const fetchNotifications = useCallback(async (tab: "all" | "unread", clearExisting = true) => {
-    if (clearExisting) {
-      setLoading(true);
-    }
-    try {
-      const data = await getNotifications({
-        unreadOnly: tab === "unread",
-        limit: 20,
-      });
-      setNotifications(data.notifications as any);
-      setNextCursor(data.nextCursor);
-    } catch (err: any) {
-      toast.error(err?.message || "Failed to load notifications");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchNotifications = useCallback(
+    async (tab: "all" | "unread", clearExisting = true) => {
+      if (clearExisting) {
+        setLoading(true);
+      }
+      try {
+        const data = await getNotifications({
+          unreadOnly: tab === "unread",
+          limit: 20,
+        });
+        setNotifications(data.notifications as any);
+        setNextCursor(data.nextCursor);
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to load notifications");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   // Fetch more notifications for pagination
   const fetchMoreNotifications = async () => {
@@ -96,10 +112,10 @@ export default function NotificationsPage() {
   const handleMarkAsRead = async (id: string, fileId?: string) => {
     try {
       await markAsRead({ notificationId: id });
-      
+
       // Update local state
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: new Date() } : n))
+        prev.map((n) => (n.id === id ? { ...n, readAt: new Date() } : n)),
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
 
@@ -122,7 +138,7 @@ export default function NotificationsPage() {
       try {
         await markAllRead();
         setNotifications((prev) =>
-          prev.map((n) => ({ ...n, readAt: new Date() }))
+          prev.map((n) => ({ ...n, readAt: new Date() })),
         );
         if (activeTab === "unread") {
           setNotifications([]);
@@ -137,7 +153,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-4xl mx-auto">
+    <div className="flex-1 space-y-6 w-full mx-auto">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -182,16 +198,22 @@ export default function NotificationsPage() {
           onValueChange={(v) => setActiveTab(v as "all" | "unread")}
           className="w-full"
         >
-          <CardHeader className="pb-3 border-b border-border/50 bg-muted/20">
+          <CardHeader className="pb-3 border-b border-border/50">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <TabsList className="grid grid-cols-2 w-full sm:w-[240px] h-9">
                 <TabsTrigger value="all" className="text-xs">
                   All
                 </TabsTrigger>
-                <TabsTrigger value="unread" className="text-xs flex items-center gap-1.5">
+                <TabsTrigger
+                  value="unread"
+                  className="text-xs flex items-center gap-1.5"
+                >
                   Unread
                   {unreadCount > 0 && (
-                    <Badge variant="destructive" className="h-4 px-1 min-w-4 text-[9px] flex items-center justify-center">
+                    <Badge
+                      variant="destructive"
+                      className="h-4 px-1 min-w-4 text-[9px] flex items-center justify-center"
+                    >
                       {unreadCount}
                     </Badge>
                   )}
@@ -207,7 +229,10 @@ export default function NotificationsPage() {
             {loading ? (
               <div className="space-y-4 p-6">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="flex gap-4 items-start border-b border-border/30 pb-4 last:border-0">
+                  <div
+                    key={i}
+                    className="flex gap-4 items-start border-b border-border/30 pb-4 last:border-0"
+                  >
                     <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
                     <div className="flex-1 space-y-2">
                       <div className="h-4 w-[60%] bg-muted rounded animate-pulse" />
@@ -219,7 +244,9 @@ export default function NotificationsPage() {
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
                 <Inbox className="size-12 text-muted-foreground/30 stroke-[1.2] mb-4" />
-                <h3 className="text-base font-semibold text-foreground">No notifications found</h3>
+                <h3 className="text-base font-semibold text-foreground">
+                  No notifications found
+                </h3>
                 <p className="text-sm text-muted-foreground max-w-sm mt-1">
                   {activeTab === "unread"
                     ? "You have no unread notifications right now."
@@ -236,24 +263,29 @@ export default function NotificationsPage() {
                       onClick={() => handleMarkAsRead(item.id, item.file?.id)}
                       className={cn(
                         "flex items-start gap-4 p-5 hover:bg-muted/40 cursor-pointer transition-colors relative group",
-                        isUnread && "bg-primary/5 hover:bg-primary/10"
+                        isUnread && "bg-primary/5 hover:bg-primary/10",
                       )}
                     >
                       {isUnread && (
                         <span className="absolute left-2.5 top-7 size-2 rounded-full bg-primary" />
                       )}
-                      
+
                       <div className="flex-1 min-w-0 space-y-1">
-                        <p className={cn("text-sm leading-relaxed text-foreground", isUnread && "font-medium")}>
+                        <p
+                          className={cn(
+                            "text-sm leading-relaxed text-foreground",
+                            isUnread && "font-medium",
+                          )}
+                        >
                           {item.message}
                         </p>
-                        
+
                         {item.file && (
                           <div className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline mt-1 bg-primary/10 px-2 py-0.5 rounded">
                             📁 {item.file.displayName}
                           </div>
                         )}
-                        
+
                         <p className="text-[11px] text-muted-foreground">
                           {formatRelativeDate(item.createdAt.toString())}
                         </p>
@@ -263,7 +295,7 @@ export default function NotificationsPage() {
                 })}
               </div>
             )}
-            
+
             {nextCursor && !loading && (
               <div className="p-4 text-center border-t border-border/40 bg-muted/5">
                 <Button
@@ -273,7 +305,9 @@ export default function NotificationsPage() {
                   onClick={fetchMoreNotifications}
                   className="w-full sm:w-auto text-xs font-medium cursor-pointer"
                 >
-                  {loadingMore && <Loader2 className="size-3.5 animate-spin mr-2" />}
+                  {loadingMore && (
+                    <Loader2 className="size-3.5 animate-spin mr-2" />
+                  )}
                   {loadingMore ? "Loading more..." : "Load more notifications"}
                 </Button>
               </div>

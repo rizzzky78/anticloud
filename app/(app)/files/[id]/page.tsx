@@ -21,7 +21,7 @@ export default async function FileDetailPage({ params }: PageProps) {
   const { id } = await params;
   const user = {
     id: session.user.id,
-    role: session.user.role as string,
+    role: session.user.role as any,
     email: session.user.email as string,
     name: session.user.name as string,
   };

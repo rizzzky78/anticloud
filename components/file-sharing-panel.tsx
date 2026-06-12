@@ -2,13 +2,21 @@
 
 import { useState, useEffect, useTransition } from "react";
 import { Role } from "@prisma/client";
-import { getFilePermissions, grantFileRole, revokeFileRole } from "@/actions/roles";
+import {
+  getFilePermissions,
+  grantFileRole,
+  revokeFileRole,
+} from "@/actions/roles";
 import { searchUsers } from "@/actions/users";
 import { canManage } from "@/lib/ui-access";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -45,6 +53,7 @@ import {
   Info,
   ExternalLink,
   ShieldAlert,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FileMetaRecord } from "@/lib/file-meta";
@@ -75,7 +84,13 @@ interface FileSharingPanelProps {
   fileId: string;
   file: Pick<
     FileMetaRecord,
-    "id" | "displayName" | "visibility" | "guestAccess" | "isMentionRestricted" | "ownerId" | "isReadOnly"
+    | "id"
+    | "displayName"
+    | "visibility"
+    | "guestAccess"
+    | "isMentionRestricted"
+    | "ownerId"
+    | "isReadOnly"
   >;
   currentUserRole: string;
   currentUserId: string;
@@ -99,14 +114,18 @@ export function FileSharingPanel({
 
   // Search user selection state
   const [userQuery, setUserQuery] = useState("");
-  const [userSearchResults, setUserSearchResults] = useState<ShareGrantUser[]>([]);
+  const [userSearchResults, setUserSearchResults] = useState<ShareGrantUser[]>(
+    [],
+  );
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ShareGrantUser | null>(null);
   const [selectedRole, setSelectedRole] = useState<Role>("VIEWER");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Revoke state
-  const [revokeTarget, setRevokeTarget] = useState<SharePermission | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<SharePermission | null>(
+    null,
+  );
 
   const userCanManage = canManage(file, currentUserId, currentUserRole);
 
@@ -141,7 +160,9 @@ export function FileSharingPanel({
         const users = await searchUsers(userQuery.trim());
         // Filter out file owner and users who already have explicit permission
         const filtered = (users as ShareGrantUser[]).filter(
-          (u) => u.id !== file.ownerId && !permissions.some((p) => p.userId === u.id)
+          (u) =>
+            u.id !== file.ownerId &&
+            !permissions.some((p) => p.userId === u.id),
         );
         setUserSearchResults(filtered);
       } catch (err) {
@@ -164,7 +185,9 @@ export function FileSharingPanel({
           targetUserId: selectedUser.id,
           role: selectedRole,
         });
-        toast.success(`Granted ${selectedRole.toLowerCase()} access to ${selectedUser.name}`);
+        toast.success(
+          `Granted ${selectedRole.toLowerCase()} access to ${selectedUser.name}`,
+        );
         setSelectedUser(null);
         setUserQuery("");
         setIsSearchOpen(false);
@@ -223,7 +246,7 @@ export function FileSharingPanel({
           <h4 className="text-sm font-semibold flex items-center gap-2">
             {file.visibility === "PUBLIC" ? (
               <>
-                <Globe className="size-4 text-emerald-500" /> Public Access Link
+                <Globe className="size-4 text-zinc-500" /> Public Access Link
               </>
             ) : (
               <>
@@ -232,27 +255,29 @@ export function FileSharingPanel({
             )}
           </h4>
           <p className="text-xs text-muted-foreground leading-normal">
-            {file.visibility === "PUBLIC" ? (
-              file.guestAccess ? (
-                "Anyone on the internet with the link can view and download this file."
-              ) : (
-                "Any signed-in user with the link can view this file."
-              )
-            ) : (
-              "Only the owner and people with explicit permission grants can access this file."
-            )}
+            {file.visibility === "PUBLIC"
+              ? file.guestAccess
+                ? "Anyone on the internet with the link can view and download this file."
+                : "Any signed-in user with the link can view this file."
+              : "Only the owner and people with explicit permission grants can access this file."}
           </p>
           <div className="flex flex-wrap gap-2 pt-1">
             <Badge variant="outline" className="text-xs">
               {file.visibility === "PUBLIC" ? "Public" : "Private"}
             </Badge>
             {file.visibility === "PUBLIC" && file.guestAccess && (
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none text-[10px]">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none text-[10px]"
+              >
                 Guest Allowed
               </Badge>
             )}
             {file.isMentionRestricted && (
-              <Badge variant="secondary" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-none text-[10px]">
+              <Badge
+                variant="secondary"
+                className="bg-zinc-100 text-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300 border-none text-[10px]"
+              >
                 Mention Gate On
               </Badge>
             )}
@@ -267,7 +292,12 @@ export function FileSharingPanel({
               </Button>
             )}
             {onOpenConfig && (
-              <Button variant="ghost" size="sm" className="border" onClick={onOpenConfig}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="border"
+                onClick={onOpenConfig}
+              >
                 <Settings className="size-3.5 mr-1" /> Config Gating
               </Button>
             )}
@@ -294,9 +324,13 @@ export function FileSharingPanel({
                   >
                     <Search className="size-4 mr-2 text-muted-foreground" />
                     {selectedUser ? (
-                      <span className="text-foreground font-medium">{selectedUser.name}</span>
+                      <span className="text-foreground font-medium">
+                        {selectedUser.name}
+                      </span>
                     ) : (
-                      <span className="text-muted-foreground">Search by name, email, or username...</span>
+                      <span className="text-muted-foreground">
+                        Search by name, email, or username...
+                      </span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -310,7 +344,8 @@ export function FileSharingPanel({
                     <CommandList>
                       {searchingUsers && (
                         <div className="flex items-center justify-center p-3 text-xs text-muted-foreground">
-                          <Loader2 className="size-4 animate-spin mr-2" /> Searching...
+                          <Loader2 className="size-4 animate-spin mr-2" />{" "}
+                          Searching...
                         </div>
                       )}
 
@@ -326,15 +361,24 @@ export function FileSharingPanel({
                               className="flex items-center gap-2 py-2 cursor-pointer"
                             >
                               <Avatar className="size-6">
-                                {user.image && <AvatarImage src={user.image} alt={user.name} />}
+                                {user.image && (
+                                  <AvatarImage
+                                    src={user.image}
+                                    alt={user.name}
+                                  />
+                                )}
                                 <AvatarFallback className="text-[0.65rem]">
                                   {getInitials(user.name)}
                                 </AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-semibold truncate leading-none mb-0.5">{user.name}</span>
+                                <span className="text-xs font-semibold truncate leading-none mb-0.5">
+                                  {user.name}
+                                </span>
                                 <span className="text-[0.65rem] text-muted-foreground truncate">
-                                  {user.username ? `@${user.username}` : user.email}
+                                  {user.username
+                                    ? `@${user.username}`
+                                    : user.email}
                                 </span>
                               </div>
                             </CommandItem>
@@ -342,11 +386,13 @@ export function FileSharingPanel({
                         </CommandGroup>
                       )}
 
-                      {!searchingUsers && userQuery.trim() && userSearchResults.length === 0 && (
-                        <CommandEmpty className="p-3 text-xs text-muted-foreground text-center">
-                          No users found
-                        </CommandEmpty>
-                      )}
+                      {!searchingUsers &&
+                        userQuery.trim() &&
+                        userSearchResults.length === 0 && (
+                          <CommandEmpty className="p-3 text-xs text-muted-foreground text-center">
+                            No users found
+                          </CommandEmpty>
+                        )}
 
                       {!userQuery.trim() && (
                         <CommandEmpty className="p-3 text-xs text-muted-foreground text-center">
@@ -366,13 +412,13 @@ export function FileSharingPanel({
                 onValueChange={(val: Role) => setSelectedRole(val)}
                 disabled={isPending}
               >
-                <SelectTrigger className="w-full h-10 border-b-input">
+                <SelectTrigger className="w-full h-10 border-b-input capitalize">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableRoles.map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {role}
+                    <SelectItem key={role} value={role} className="capitalize">
+                      {role.toLowerCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -395,7 +441,8 @@ export function FileSharingPanel({
           </div>
           {selectedUser && (
             <p className="text-[10px] text-muted-foreground">
-              Granting <strong>{selectedRole}</strong> access to {selectedUser.name} ({selectedUser.email})
+              Granting <strong>{selectedRole}</strong> access to{" "}
+              {selectedUser.name} ({selectedUser.email})
             </p>
           )}
         </div>
@@ -404,7 +451,8 @@ export function FileSharingPanel({
       {/* Users list with access */}
       <div className="space-y-3">
         <h4 className="text-sm font-semibold flex items-center gap-2">
-          <Users className="size-4 text-muted-foreground" /> Explicit Access Grants
+          <Users className="size-4 text-muted-foreground" /> Explicit Access
+          Grants
         </h4>
 
         {loading ? (
@@ -415,7 +463,9 @@ export function FileSharingPanel({
         ) : permissions.length === 0 ? (
           <div className="text-center p-6 border border-dashed rounded-xl text-muted-foreground">
             <Users className="size-8 mx-auto text-muted-foreground/20 mb-2" />
-            <p className="text-xs">No explicit user access grants exist for this file.</p>
+            <p className="text-xs">
+              No explicit user access grants exist for this file.
+            </p>
             <p className="text-[10px] mt-0.5 text-muted-foreground/80">
               Only the owner has default full access.
             </p>
@@ -432,7 +482,12 @@ export function FileSharingPanel({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar className="size-8 shrink-0">
-                        {grantUser.image && <AvatarImage src={grantUser.image} alt={grantUser.name} />}
+                        {grantUser.image && (
+                          <AvatarImage
+                            src={grantUser.image}
+                            alt={grantUser.name}
+                          />
+                        )}
                         <AvatarFallback className="text-xs">
                           {getInitials(grantUser.name)}
                         </AvatarFallback>
@@ -443,20 +498,16 @@ export function FileSharingPanel({
                             {grantUser.name}
                           </span>
                           <Badge
-                            variant={
-                              grant.role === "SUPERADMIN"
-                                ? "destructive"
-                                : grant.role === "ADMIN"
-                                ? "default"
-                                : "secondary"
-                            }
-                            className="text-[9px] px-1.5 py-0.5"
+                            variant="outline"
+                            className="text-[9px] px-1.5 py-0.5 border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50"
                           >
                             {grant.role}
                           </Badge>
                         </div>
                         <span className="text-[10px] text-muted-foreground truncate">
-                          {grantUser.username ? `@${grantUser.username}` : grantUser.email}
+                          {grantUser.username
+                            ? `@${grantUser.username}`
+                            : grantUser.email}
                         </span>
                         {grant.grantedBy && (
                           <span className="text-[9px] text-muted-foreground/70 mt-0.5">
@@ -488,14 +539,18 @@ export function FileSharingPanel({
       </div>
 
       {/* Revoke confirmation Dialog */}
-      <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
+      <AlertDialog
+        open={!!revokeTarget}
+        onOpenChange={(open) => !open && setRevokeTarget(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke file access?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to revoke <strong>{revokeTarget?.role}</strong> access for{" "}
-              <strong>{revokeTarget?.user.name}</strong>? They will lose explicit permission to view,
-              download, or edit this file.
+              Are you sure you want to revoke{" "}
+              <strong>{revokeTarget?.role}</strong> access for{" "}
+              <strong>{revokeTarget?.user.name}</strong>? They will lose
+              explicit permission to view, download, or edit this file.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

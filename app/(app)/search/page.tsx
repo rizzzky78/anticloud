@@ -9,9 +9,22 @@ import { SearchInput } from "@/components/search-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Search, SlidersHorizontal, X, FileSearch, ArrowRight } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Search,
+  SlidersHorizontal,
+  X,
+  FileSearch,
+  ArrowRight,
+} from "lucide-react";
 import Link from "next/link";
+import { format } from "date-fns";
 
 interface PageProps {
   searchParams: Promise<{
@@ -66,10 +79,13 @@ export default async function SearchPage({ searchParams }: PageProps) {
   ]);
 
   // Helper to construct clear-filter urls
-  const getFilterClearUrl = (type: "tag" | "mime" | "uploader" | "date", val?: string) => {
+  const getFilterClearUrl = (
+    type: "tag" | "mime" | "uploader" | "date",
+    val?: string,
+  ) => {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
-    
+
     // Add other active parameters back
     if (type !== "tag" && tags) params.set("tags", tags);
     if (type === "tag" && tags && val) {
@@ -82,7 +98,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
     if (type !== "mime" && mimeType) params.set("mimeType", mimeType);
     if (type !== "uploader" && uploaderId) params.set("uploaderId", uploaderId);
-    
+
     if (type !== "date") {
       if (start) params.set("start", start);
       if (end) params.set("end", end);
@@ -91,27 +107,40 @@ export default async function SearchPage({ searchParams }: PageProps) {
     return `/search?${params.toString()}`;
   };
 
-  const hasActiveFilters = !!tags || !!uploaderId || (!!mimeType && mimeType !== "all") || !!start || !!end;
+  const hasActiveFilters =
+    !!tags ||
+    !!uploaderId ||
+    (!!mimeType && mimeType !== "all") ||
+    !!start ||
+    !!end;
   const showResults = !!q || hasActiveFilters;
 
   return (
-    <div className="flex flex-col flex-1 p-6 gap-6 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col flex-1 gap-6 mx-auto w-full">
       {/* Page Header */}
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-bold tracking-tight">Search Archive</h1>
         <p className="text-xs text-muted-foreground">
-          Perform indexed full-text search across file names, tag contents, mentions, and collaborative notes.
+          Perform indexed full-text search across file names, tag contents,
+          mentions, and collaborative notes.
         </p>
       </div>
 
       {/* Search Bar & Mobile Filters trigger */}
       <div className="flex items-center gap-3">
-        <SearchInput className="flex-1" placeholder="Type keywords, e.g. 'invoice', 'report'..." />
-        
+        <SearchInput
+          className="flex-1"
+          placeholder="Type keywords, e.g. 'invoice', 'report'..."
+        />
+
         {/* Mobile Filters Trigger */}
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="lg:hidden shrink-0 h-10 w-10 border-b-input">
+            <Button
+              variant="outline"
+              size="icon"
+              className="lg:hidden shrink-0 h-10 w-10 border-b-input"
+            >
               <SlidersHorizontal className="size-4" />
               <span className="sr-only">Filters</span>
             </Button>
@@ -131,11 +160,17 @@ export default async function SearchPage({ searchParams }: PageProps) {
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
             Active filters:
           </span>
-          
+
           {/* Tags */}
           {tags &&
             tags.split(",").map((tag) => (
-              <Button key={tag} variant="secondary" size="xs" className="h-6 rounded-full text-[10px] gap-1 px-2.5" asChild>
+              <Button
+                key={tag}
+                variant="secondary"
+                size="xs"
+                className="h-6 rounded-full text-[10px] gap-1 px-2.5"
+                asChild
+              >
                 <Link href={getFilterClearUrl("tag", tag.trim())}>
                   #{tag.trim()}
                   <X className="size-3 text-muted-foreground hover:text-foreground" />
@@ -145,7 +180,12 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
           {/* Mime Type */}
           {mimeType && mimeType !== "all" && (
-            <Button variant="secondary" size="xs" className="h-6 rounded-full text-[10px] gap-1 px-2.5" asChild>
+            <Button
+              variant="secondary"
+              size="xs"
+              className="h-6 rounded-full text-[10px] gap-1 px-2.5"
+              asChild
+            >
               <Link href={getFilterClearUrl("mime")}>
                 Type: {mimeType.split("/")[1] || mimeType}
                 <X className="size-3 text-muted-foreground hover:text-foreground" />
@@ -155,7 +195,12 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
           {/* Uploader */}
           {uploaderId && uploaderUser && (
-            <Button variant="secondary" size="xs" className="h-6 rounded-full text-[10px] gap-1 px-2.5" asChild>
+            <Button
+              variant="secondary"
+              size="xs"
+              className="h-6 rounded-full text-[10px] gap-1 px-2.5"
+              asChild
+            >
               <Link href={getFilterClearUrl("uploader")}>
                 By: {uploaderUser.name}
                 <X className="size-3 text-muted-foreground hover:text-foreground" />
@@ -165,7 +210,12 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
           {/* Date range */}
           {(start || end) && (
-            <Button variant="secondary" size="xs" className="h-6 rounded-full text-[10px] gap-1 px-2.5" asChild>
+            <Button
+              variant="secondary"
+              size="xs"
+              className="h-6 rounded-full text-[10px] gap-1 px-2.5"
+              asChild
+            >
               <Link href={getFilterClearUrl("date")}>
                 Uploaded: {start ? format(new Date(start), "LLL dd") : ""}
                 {start && end ? " - " : ""}
@@ -190,9 +240,13 @@ export default async function SearchPage({ searchParams }: PageProps) {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <h3 className="font-semibold text-base">Start searching your archive</h3>
+                  <h3 className="font-semibold text-base">
+                    Start searching your archive
+                  </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Type a query above or choose a filter from the panel to find files. Your query searches display names, tags, mentions, and collaborative notes.
+                    Type a query above or choose a filter from the panel to find
+                    files. Your query searches display names, tags, mentions,
+                    and collaborative notes.
                   </p>
                 </div>
               </CardContent>
@@ -201,14 +255,16 @@ export default async function SearchPage({ searchParams }: PageProps) {
             <Card className="flex flex-col items-center justify-center flex-1 py-16 text-center border-dashed rounded-2xl bg-muted/5">
               <CardContent className="space-y-4 max-w-md">
                 <div className="flex justify-center">
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-2xl shadow-xs">
+                  <div className="p-4 bg-zinc-50 border border-zinc-200 text-zinc-500 rounded-2xl shadow-xs dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-400">
                     <FileSearch className="size-10" />
                   </div>
                 </div>
                 <div className="space-y-1">
                   <h3 className="font-semibold text-base">No results found</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    We couldn't find any files matching your search. Try adjusting your search keywords or clearing some filters to expand your search.
+                    We couldn't find any files matching your search. Try
+                    adjusting your search keywords or clearing some filters to
+                    expand your search.
                   </p>
                 </div>
               </CardContent>

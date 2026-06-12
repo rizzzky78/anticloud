@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
-import { usePathname, useSearchParams, useRouter } from "next/navigation"
+import * as React from "react";
+import Link from "next/link";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 
-import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
-import { NavUser } from "@/components/nav-user"
-import { Button } from "@/components/ui/button"
-import { UploadDialog } from "@/components/upload-dialog"
+import { NavMain } from "@/components/nav-main";
+import { NavSecondary } from "@/components/nav-secondary";
+import { NavUser } from "@/components/nav-user";
+import { Button } from "@/components/ui/button";
+import { UploadDialog } from "@/components/upload-dialog";
 import {
   Sidebar,
   SidebarContent,
@@ -20,7 +20,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 import {
   FolderIcon,
   SearchIcon,
@@ -31,51 +31,53 @@ import {
   Settings2Icon,
   CloudIcon,
   UploadIcon,
-} from "lucide-react"
+} from "lucide-react";
 
 interface AppSidebarUser {
-  id?: string
-  name: string
-  email: string
-  image?: string | null
-  role?: string | null
+  id?: string;
+  name: string;
+  email: string;
+  image?: string | null;
+  role?: string | null;
 }
 
 const adminNavItems = [
   { title: "Users & Roles", url: "/admin/users", icon: <UsersIcon /> },
   { title: "Recycle Bin", url: "/admin/recycle-bin", icon: <Trash2Icon /> },
   { title: "Jobs", url: "/admin/jobs", icon: <BriefcaseIcon /> },
-]
+];
 
 export function AppSidebar({
   user,
   ...props
 }: React.ComponentProps<typeof Sidebar> & { user?: AppSidebarUser }) {
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const [isUploadOpen, setIsUploadOpen] = React.useState(false)
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [isUploadOpen, setIsUploadOpen] = React.useState(false);
 
   const currentUser = user || {
     name: "Mock User",
     email: "mock@example.com",
     role: "VIEWER",
-  }
+  };
 
-  const isAdmin = currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN"
+  const isAdmin =
+    currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN";
 
-  const currentFolderPath = searchParams.get("folderPath") ?? "/"
+  const currentFolderPath = searchParams.get("folderPath") ?? "/";
 
   const navMain = [
     { title: "Files", url: "/files", icon: <FolderIcon /> },
     { title: "Search", url: "/search", icon: <SearchIcon /> },
     { title: "Notifications", url: "/notifications", icon: <BellIcon /> },
-  ]
+    { title: "Recycle Bin", url: "/trash", icon: <Trash2Icon /> },
+  ];
 
   return (
     <>
       <Sidebar collapsible="offcanvas" {...props}>
-        <SidebarHeader className="gap-4">
+        <SidebarHeader className="gap-4 dark:bg-zinc-900">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -90,19 +92,18 @@ export function AppSidebar({
             </SidebarMenuItem>
           </SidebarMenu>
 
-          <div className="px-2">
+          <div className="px-4 py-1">
             <Button
               onClick={() => setIsUploadOpen(true)}
-              className="w-full gap-2 justify-center shadow-sm"
-              size="sm"
+              className="w-full rounded-full shadow-md bg-white hover:bg-zinc-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border border-zinc-200/80 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 h-12 px-5 font-semibold gap-2.5 justify-center text-sm cursor-pointer"
             >
-              <UploadIcon className="size-4" />
+              <UploadIcon className="size-4.5" />
               <span>Upload File</span>
             </Button>
           </div>
         </SidebarHeader>
 
-        <SidebarContent>
+        <SidebarContent className="dark:bg-zinc-900">
           <NavMain items={navMain} />
 
           {isAdmin && (
@@ -144,7 +145,7 @@ export function AppSidebar({
           />
         </SidebarContent>
 
-        <SidebarFooter>
+        <SidebarFooter className="dark:bg-zinc-900">
           <NavUser
             user={{
               name: currentUser.name,
@@ -159,10 +160,9 @@ export function AppSidebar({
         onOpenChange={setIsUploadOpen}
         currentFolderPath={currentFolderPath}
         onSuccess={() => {
-          router.refresh()
+          router.refresh();
         }}
       />
     </>
-  )
+  );
 }
-

@@ -247,6 +247,60 @@ export async function listFilesGrouped(
   return groupRows(rows);
 }
 
+// ─── Recycle bin (user-scoped soft-deleted files) ─────────────────────────────
+
+/** Grace window before phase-09 cron hard-deletes a soft-deleted file. */
+const GRACE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+export interface DeletedFileEntry {
+  id: string;
+  displayName: string;
+  mimeType: string;
+  /** Serialised BigInt string. */
+  size: string;
+  folderPath: string;
+  deletedAt: string;
+}
+
+/**
+ * List the soft-deleted files the given user may restore — files they own or
+ * hold an ADMIN/SUPERADMIN grant on — still inside the 30-day grace window.
+ * This is the user-facing recycle bin (distinct from the SUPERADMIN admin bin,
+ * which lists every deleted file).
+ */
+export async function listDeletedFilesForUser(
+  user: { id: string; role: string },
+): Promise<DeletedFileEntry[]> {
+  const graceCutoff = new Date(Date.now() - GRACE_WINDOW_MS);
+
+  const files = await db.file.findMany({
+    where: {
+      deletedAt: { not: null, gt: graceCutoff },
+      OR: [
+        { ownerId: user.id },
+        {
+          permissions: {
+            some: {
+              userId: user.id,
+              role: { in: ["ADMIN", "SUPERADMIN"] },
+            },
+          },
+        },
+      ],
+    },
+    orderBy: { deletedAt: "desc" },
+  });
+
+  return files.map((f) => ({
+    id: f.id,
+    displayName: f.displayName,
+    mimeType: f.mimeType,
+    size: f.size.toString(),
+    folderPath: f.folderPath,
+    deletedAt: f.deletedAt!.toISOString(),
+  }));
+}
+
 export function getImmediateSubfolders(currentPath: string, allPaths: string[]): string[] {
   const normalizedCurrent = currentPath.endsWith("/") ? currentPath : currentPath + "/";
   const subfolders = new Set<string>();

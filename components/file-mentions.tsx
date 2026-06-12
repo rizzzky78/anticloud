@@ -235,7 +235,7 @@ export function FileMentions({
         )}
 
         {isMentionRestricted && (
-          <p className="text-[0.7rem] text-purple-600 dark:text-purple-400 leading-normal bg-purple-500/10 p-2 rounded border border-purple-500/20 mt-1">
+          <p className="text-[0.7rem] text-zinc-600 dark:text-zinc-400 leading-normal bg-zinc-50 dark:bg-zinc-900/40 p-2 rounded border border-zinc-200 dark:border-zinc-800/80 mt-1">
             ℹ️ Access to this file is gated: only users mentioned here or who
             have explicit permission grants can view it.
           </p>

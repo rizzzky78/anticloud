@@ -1,30 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Noto_Sans, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
-const playfairDisplayHeading = Playfair_Display({
-  subsets: ["latin"],
-  variable: "--font-heading",
-});
+const roboto = {
+  variable: "font-sans",
+};
 
-const notoSans = Noto_Sans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
+const geistSans = {
+  variable: "font-geist-sans",
+};
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const geistMono = {
+  variable: "font-geist-mono",
+};
 
 export const metadata: Metadata = {
   title: "Anticloud",
@@ -44,8 +35,7 @@ export default function RootLayout({
         "h-full antialiased",
         geistSans.variable,
         geistMono.variable,
-        notoSans.variable,
-        playfairDisplayHeading.variable,
+        roboto.variable,
         "font-sans"
       )}
     >

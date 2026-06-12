@@ -99,25 +99,25 @@ export function JobsClient({
         );
       case "RUNNING":
         return (
-          <Badge variant="default" className="bg-sky-600 hover:bg-sky-600 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 animate-pulse">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 animate-pulse bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
             <Activity className="size-3" /> Running
           </Badge>
         );
       case "COMPLETED":
         return (
-          <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-600 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 bg-zinc-50 border-zinc-200 text-zinc-700 dark:bg-zinc-900/50 dark:border-zinc-800 dark:text-zinc-300">
             <CheckCircle className="size-3" /> Completed
           </Badge>
         );
       case "FAILED":
         return (
-          <Badge variant="destructive" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 border-zinc-300 text-zinc-700 dark:border-zinc-700 dark:text-zinc-400">
             <XCircle className="size-3" /> Failed
           </Badge>
         );
       case "DEAD_LETTER":
         return (
-          <Badge variant="destructive" className="bg-rose-950 hover:bg-rose-950 text-rose-200 border-rose-800 gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+          <Badge variant="outline" className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5 border-zinc-400 text-zinc-800 bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:bg-zinc-900">
             <AlertOctagon className="size-3" /> DLQ (Dead)
           </Badge>
         );
@@ -139,7 +139,7 @@ export function JobsClient({
             <div className="text-lg font-bold space-y-1">
               <div>Queue Depth: <span className="font-mono text-primary">{queueDepth}</span> jobs</div>
               <div className="text-sm text-muted-foreground font-normal">
-                Cache Hit Rate: <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{cacheHitRate.toFixed(1)}%</span>
+                Cache Hit Rate: <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-300">{cacheHitRate.toFixed(1)}%</span>
               </div>
             </div>
           </CardContent>
@@ -148,7 +148,7 @@ export function JobsClient({
         <Card className="border border-border/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Workers</CardTitle>
-            <Activity className="size-4 text-sky-500 animate-pulse" />
+            <Activity className="size-4 text-zinc-400 dark:text-zinc-500 animate-pulse" />
           </CardHeader>
           <CardContent>
             <div className="text-xl font-bold">{runningCount} Running</div>
@@ -161,10 +161,10 @@ export function JobsClient({
         <Card className="border border-border/80 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Dead Letter Queue</CardTitle>
-            <AlertTriangle className={dlqCount > 0 ? "size-4 text-rose-500 animate-bounce" : "size-4 text-muted-foreground/60"} />
+            <AlertTriangle className={dlqCount > 0 ? "size-4 text-zinc-800 dark:text-zinc-200 animate-pulse" : "size-4 text-muted-foreground/60"} />
           </CardHeader>
           <CardContent>
-            <div className="text-xl font-bold text-rose-500">{dlqCount} Failures</div>
+            <div className="text-xl font-bold text-zinc-800 dark:text-zinc-200">{dlqCount} Failures</div>
             <p className="text-xs text-muted-foreground mt-1">
               Jobs requiring superadmin intervention
             </p>
@@ -195,14 +195,14 @@ export function JobsClient({
                 <TabsTrigger value="running" className="text-[11px]">
                   Running
                   {runningCount > 0 && (
-                    <span className="ml-1 size-1.5 rounded-full bg-sky-500 animate-pulse" />
+                    <span className="ml-1 size-1.5 rounded-full bg-zinc-800 dark:bg-zinc-200 animate-pulse" />
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="completed" className="text-[11px]">Completed</TabsTrigger>
                 <TabsTrigger value="failed" className="text-[11px]">
                   Failed
                   {failedCount > 0 && (
-                    <Badge variant="outline" className="ml-1 h-4 px-1 text-[9px] border-rose-500 text-rose-500 font-bold">
+                    <Badge variant="outline" className="ml-1 h-4 px-1 text-[9px] border-zinc-400 text-zinc-700 font-bold bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:bg-zinc-900/50">
                       {failedCount}
                     </Badge>
                   )}
@@ -210,7 +210,7 @@ export function JobsClient({
                 <TabsTrigger value="dlq" className="text-[11px]">
                   DLQ
                   {dlqCount > 0 && (
-                    <Badge variant="destructive" className="ml-1 h-4 px-1 text-[9px] font-bold">
+                    <Badge variant="outline" className="ml-1 h-4 px-1 text-[9px] border-zinc-400 text-zinc-700 font-bold bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:bg-zinc-900/50">
                       {dlqCount}
                     </Badge>
                   )}
@@ -254,12 +254,12 @@ export function JobsClient({
                         </TableCell>
                         <TableCell>{getStatusBadge(job.status)}</TableCell>
                         <TableCell className="text-sm">
-                          <span className={job.attempts >= job.maxAttempts ? "text-rose-500 font-bold" : "text-muted-foreground"}>
+                          <span className={job.attempts >= job.maxAttempts ? "text-zinc-800 dark:text-zinc-200 font-bold" : "text-muted-foreground"}>
                             {job.attempts}
                           </span>{" "}
                           / {job.maxAttempts}
                         </TableCell>
-                        <TableCell className="text-xs text-rose-500 max-w-[250px] truncate font-mono">
+                        <TableCell className="text-xs text-zinc-600 dark:text-zinc-400 max-w-[250px] truncate font-mono">
                           {job.error || <span className="text-muted-foreground/50 italic font-sans">—</span>}
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">
@@ -358,7 +358,7 @@ export function JobsClient({
 
               {/* Error Trace if any */}
               {selectedJob.error && (
-                <div className="space-y-1.5 p-3 rounded bg-rose-500/10 border border-rose-500/20 text-rose-500">
+                <div className="space-y-1.5 p-3 rounded bg-zinc-50 border border-zinc-200 text-zinc-600 dark:bg-zinc-900/40 dark:border-zinc-800 dark:text-zinc-400">
                   <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
                     <XCircle className="size-3.5" /> Error Log
                   </span>

@@ -2,7 +2,11 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-context";
-import { listFilesGrouped, listSubfolders, listUserFolderPaths } from "@/lib/file-list";
+import {
+  listFilesGrouped,
+  listSubfolders,
+  listUserFolderPaths,
+} from "@/lib/file-list";
 import { FileList } from "@/components/file-list";
 import {
   Breadcrumb,
@@ -66,7 +70,7 @@ export default async function FilesPage({ searchParams }: PageProps) {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6">
       {/* Page Header with Breadcrumbs */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-2">
@@ -81,7 +85,9 @@ export default async function FilesPage({ searchParams }: PageProps) {
                         <BreadcrumbPage>{bc.label}</BreadcrumbPage>
                       ) : (
                         <BreadcrumbLink asChild>
-                          <Link href={`/files?folderPath=${encodeURIComponent(bc.path)}`}>
+                          <Link
+                            href={`/files?folderPath=${encodeURIComponent(bc.path)}`}
+                          >
                             {bc.label}
                           </Link>
                         </BreadcrumbLink>
@@ -115,7 +121,9 @@ export default async function FilesPage({ searchParams }: PageProps) {
             <PaginationContent>
               {currentPage > 1 && (
                 <PaginationItem>
-                  <PaginationPrevious href={getPaginationUrl(currentPage - 1)} />
+                  <PaginationPrevious
+                    href={getPaginationUrl(currentPage - 1)}
+                  />
                 </PaginationItem>
               )}
               {hasNextPage && (

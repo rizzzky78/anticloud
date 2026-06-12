@@ -120,7 +120,7 @@ export async function getUnreadCount(): Promise<number> {
   const session = await getCurrentUser();
   if (!session) throw AppError.unauthorized();
 
-  return db.notification.count({
+  return await db.notification.count({
     where: {
       userId: session.user.id,
       readAt: null,

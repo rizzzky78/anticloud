@@ -94,6 +94,21 @@ export function getObjectStream(key: string): Promise<Readable> {
   return storage.getObject(BUCKET, key);
 }
 
+/**
+ * Open a readable stream for a byte range of an object. Used to satisfy HTTP
+ * `Range` requests so media players can seek without downloading the whole file.
+ *
+ * @param offset zero-based start byte (inclusive).
+ * @param length number of bytes to read; omit/0 to read to the end of the object.
+ */
+export function getPartialObjectStream(
+  key: string,
+  offset: number,
+  length?: number,
+): Promise<Readable> {
+  return storage.getPartialObject(BUCKET, key, offset, length ?? 0);
+}
+
 /** Remove an object. */
 export function removeObject(key: string): Promise<void> {
   return storage.removeObject(BUCKET, key);

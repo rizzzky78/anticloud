@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
-import { getObjectStream } from "@/lib/storage";
+import { getObjectStream, getPartialObjectStream } from "@/lib/storage";
 import { toApiError, statusFor } from "@/lib/result";
 
 export const runtime = "nodejs";
@@ -53,10 +53,49 @@ async function resolveReadAccess(
 }
 
 /**
+ * Parse a single-range HTTP `Range` header against a known object size.
+ * Supports `bytes=start-end`, `bytes=start-`, and `bytes=-suffixLength`.
+ * Returns clamped, inclusive byte bounds, or `null` when there is no usable
+ * range (absent header, malformed, multi-range, or unsatisfiable).
+ */
+function parseRangeHeader(
+  header: string | null,
+  size: number,
+): { start: number; end: number } | null {
+  if (!header || size <= 0) return null;
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match) return null;
+
+  const [, rawStart, rawEnd] = match;
+  if (rawStart === "" && rawEnd === "") return null;
+
+  let start: number;
+  let end: number;
+
+  if (rawStart === "") {
+    // Suffix range: last N bytes.
+    const suffix = Number(rawEnd);
+    if (suffix <= 0) return null;
+    start = Math.max(0, size - suffix);
+    end = size - 1;
+  } else {
+    start = Number(rawStart);
+    end = rawEnd === "" ? size - 1 : Number(rawEnd);
+  }
+
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  if (start > end || start >= size) return null;
+
+  return { start, end: Math.min(end, size - 1) };
+}
+
+/**
  * GET /api/files/[id]
  *
  * Streams the file binary from MinIO. Returns 404 for both non-existent files
- * and permission failures to prevent existence enumeration.
+ * and permission failures to prevent existence enumeration. Honors HTTP `Range`
+ * requests (206) so audio/video players can seek.
  */
 export async function GET(
   request: NextRequest,
@@ -75,25 +114,63 @@ export async function GET(
       return new Response(null, { status: 404 });
     }
 
+    const totalSize = Number(file.size);
+    const range = parseRangeHeader(request.headers.get("range"), totalSize);
+
+    // Thumbnail/preview requests from file lists. These fire once per visible
+    // row, so they must not be audited (would flood the trail) and should be
+    // browser-cacheable rather than revalidated on every scroll/back-nav.
+    const isPreview = request.nextUrl.searchParams.get("preview") === "1";
+
+    // Record one audit entry per view. Media players issue many follow-up Range
+    // requests while seeking; only the initial request (full body, or a range
+    // starting at byte 0) is logged so the audit trail isn't flooded.
+    if (!isPreview && (!range || range.start === 0)) {
+      const { recordAudit } = await import("@/lib/audit");
+      await recordAudit({
+        actorId: session?.user?.id || null,
+        action: "file.download",
+        targetType: "file",
+        targetId: file.id,
+        metadata: { displayName: file.displayName },
+      });
+    }
+
+    const commonHeaders: Record<string, string> = {
+      "Content-Type": file.mimeType,
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.displayName)}`,
+      "Cache-Control": "private, no-cache",
+      // Advertise range support so players (Safari especially) enable seeking.
+      "Accept-Ranges": "bytes",
+    };
+
+    // Partial content — stream just the requested byte window for media seeking.
+    if (range) {
+      const chunkLength = range.end - range.start + 1;
+      const partial = await getPartialObjectStream(
+        file.objectKey,
+        range.start,
+        chunkLength,
+      );
+      const partialStream = Readable.toWeb(partial) as ReadableStream;
+      return new Response(partialStream, {
+        status: 206,
+        headers: {
+          ...commonHeaders,
+          "Content-Length": chunkLength.toString(),
+          "Content-Range": `bytes ${range.start}-${range.end}/${totalSize}`,
+        },
+      });
+    }
+
     const minioStream = await getObjectStream(file.objectKey);
     const webStream = Readable.toWeb(minioStream) as ReadableStream;
-
-    const { recordAudit } = await import("@/lib/audit");
-    await recordAudit({
-      actorId: session?.user?.id || null,
-      action: "file.download",
-      targetType: "file",
-      targetId: file.id,
-      metadata: { displayName: file.displayName },
-    });
 
     return new Response(webStream, {
       status: 200,
       headers: {
-        "Content-Type": file.mimeType,
-        "Content-Length": file.size.toString(),
-        "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.displayName)}`,
-        "Cache-Control": "private, no-cache",
+        ...commonHeaders,
+        "Content-Length": totalSize.toString(),
       },
     });
   } catch (err) {
