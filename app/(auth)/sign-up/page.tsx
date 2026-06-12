@@ -103,7 +103,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <Card className="w-full max-w-lg">
+    <Card className="w-full max-w-lg border-white/10 bg-white/5 ring-white/10 shadow-2xl backdrop-blur-xl supports-[backdrop-filter]:bg-white/5">
       <form onSubmit={handleSubmit}>
         <CardHeader className="mb-8">
           <CardTitle className="text-2xl">Create account</CardTitle>
