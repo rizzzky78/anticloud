@@ -21,6 +21,15 @@ const metaSchema = z.object({
   mimeType: z.string().min(1).max(127),
   folderPath: z.string().default("/"),
   visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PRIVATE"),
+  guestAccess: z.boolean().default(false),
+  // Optional TTL: an ISO-8601 datetime in the future, or null for no expiry.
+  expiresAt: z.iso
+    .datetime()
+    .nullable()
+    .default(null)
+    .refine((v) => v == null || new Date(v).getTime() > Date.now(), {
+      message: "Expiration must be a future date",
+    }),
 });
 
 /**
@@ -80,6 +89,8 @@ export async function POST(request: NextRequest) {
       mimeType: request.headers.get("content-type") ?? "application/octet-stream",
       folderPath: request.headers.get("x-folder-path") ?? "/",
       visibility: request.headers.get("x-visibility") ?? "PRIVATE",
+      guestAccess: request.headers.get("x-guest-access") === "true",
+      expiresAt: request.headers.get("x-expires-at") || null,
     });
     if (!parsed.success) {
       const msg = parsed.error.issues.map((i) => i.message).join("; ");
@@ -95,7 +106,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { key, id } = buildObjectKey();
-    const { displayName, mimeType, folderPath, visibility } = parsed.data;
+    const { displayName, mimeType, folderPath, visibility, expiresAt } = parsed.data;
+    // Guest access only applies to PUBLIC files.
+    const guestAccess = visibility === "PUBLIC" && parsed.data.guestAccess;
 
     // Convert Web ReadableStream → Node.js Readable so MinIO can consume it.
     // The stream is never written to disk; it flows directly to object storage.
@@ -119,6 +132,8 @@ export async function POST(request: NextRequest) {
             size: BigInt(size),
             folderPath,
             visibility,
+            guestAccess,
+            expiresAt: expiresAt ? new Date(expiresAt) : null,
           },
         });
 
@@ -128,13 +143,27 @@ export async function POST(request: NextRequest) {
           action: "file.upload",
           targetType: "file",
           targetId: id,
-          metadata: { displayName, mimeType, size: size.toString(), folderPath, visibility },
+          metadata: {
+            displayName,
+            mimeType,
+            size: size.toString(),
+            folderPath,
+            visibility,
+            guestAccess,
+            expiresAt,
+          },
         });
       },
     );
 
     return Response.json({ id }, { status: 201 });
   } catch (err) {
+    // AppErrors are expected/user-facing; anything else is an unexpected fault
+    // (storage unreachable, bucket missing, DB constraint, …). Log those so the
+    // real cause is visible instead of collapsing silently to a generic 500.
+    if (statusFor(err) >= 500) {
+      console.error("[upload] Unexpected error during file upload:", err);
+    }
     return Response.json(toApiError(err), { status: statusFor(err) });
   }
 }

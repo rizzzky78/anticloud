@@ -21,9 +21,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { UploadCloud, FileIcon, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  UploadCloud,
+  FileIcon,
+  X,
+  CheckCircle2,
+  AlertCircle,
+  CalendarIcon,
+} from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { formatBytes } from "@/lib/format";
+
+type TtlPreset = "never" | "1h" | "24h" | "7d" | "30d" | "custom";
+
+const TTL_PRESET_MS: Record<Exclude<TtlPreset, "never" | "custom">, number> = {
+  "1h": 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+};
 
 interface UploadDialogProps {
   isOpen: boolean;
@@ -49,6 +72,8 @@ export function UploadDialog({
   const [folderPath, setFolderPath] = useState(currentFolderPath);
   const [visibility, setVisibility] = useState<"PUBLIC" | "PRIVATE">("PRIVATE");
   const [guestAccess, setGuestAccess] = useState(false);
+  const [ttlPreset, setTtlPreset] = useState<TtlPreset>("never");
+  const [customExpiry, setCustomExpiry] = useState<Date | undefined>(undefined);
   const [queue, setQueue] = useState<UploadQueueItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -60,10 +85,26 @@ export function UploadDialog({
       setFolderPath(currentFolderPath);
       setVisibility("PRIVATE");
       setGuestAccess(false);
+      setTtlPreset("never");
+      setCustomExpiry(undefined);
       setQueue([]);
       setIsUploading(false);
     }
   }, [isOpen, currentFolderPath]);
+
+  /**
+   * Resolve the selected TTL to an absolute ISO expiry, or null for "never".
+   * Computed at send time so relative presets are anchored to the upload moment.
+   */
+  const resolveExpiresAt = (): string | null => {
+    if (ttlPreset === "never") return null;
+    if (ttlPreset === "custom") {
+      return customExpiry && customExpiry.getTime() > Date.now()
+        ? customExpiry.toISOString()
+        : null;
+    }
+    return new Date(Date.now() + TTL_PRESET_MS[ttlPreset]).toISOString();
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -115,6 +156,13 @@ export function UploadDialog({
 
   const startUpload = () => {
     if (queue.length === 0 || isUploading) return;
+    if (
+      ttlPreset === "custom" &&
+      (!customExpiry || customExpiry.getTime() <= Date.now())
+    ) {
+      toast.error("Pick a future expiration date, or choose “Never expires”.");
+      return;
+    }
     setIsUploading(true);
     uploadSequentially(0);
   };
@@ -134,15 +182,15 @@ export function UploadDialog({
     }
 
     setQueue((prev) =>
-      prev.map((q, idx) => (idx === index ? { ...q, status: "uploading" } : q))
+      prev.map((q, idx) => (idx === index ? { ...q, status: "uploading" } : q)),
     );
 
     const xhr = new XMLHttpRequest();
     activeXhrRef.current = xhr;
     xhr.open("POST", "/api/files/upload", true);
-    
+
     xhr.setRequestHeader("Content-Length", item.file.size.toString());
-    
+
     let displayName = item.file.name;
     try {
       xhr.setRequestHeader("X-Display-Name", displayName);
@@ -151,8 +199,11 @@ export function UploadDialog({
       xhr.setRequestHeader("X-Display-Name", displayName);
     }
 
-    xhr.setRequestHeader("Content-Type", item.file.type || "application/octet-stream");
-    
+    xhr.setRequestHeader(
+      "Content-Type",
+      item.file.type || "application/octet-stream",
+    );
+
     let cleanFolder = folderPath.trim();
     if (!cleanFolder.startsWith("/")) {
       cleanFolder = "/" + cleanFolder;
@@ -160,12 +211,23 @@ export function UploadDialog({
     cleanFolder = cleanFolder.replace(/\/+/g, "/");
     xhr.setRequestHeader("X-Folder-Path", cleanFolder);
     xhr.setRequestHeader("X-Visibility", visibility);
+    xhr.setRequestHeader(
+      "X-Guest-Access",
+      visibility === "PUBLIC" && guestAccess ? "true" : "false",
+    );
+
+    const expiresAt = resolveExpiresAt();
+    if (expiresAt) {
+      xhr.setRequestHeader("X-Expires-At", expiresAt);
+    }
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentage = Math.round((event.loaded / event.total) * 100);
         setQueue((prev) =>
-          prev.map((q, idx) => (idx === index ? { ...q, progress: percentage } : q))
+          prev.map((q, idx) =>
+            idx === index ? { ...q, progress: percentage } : q,
+          ),
         );
       }
     };
@@ -174,7 +236,9 @@ export function UploadDialog({
       activeXhrRef.current = null;
       if (xhr.status === 201) {
         setQueue((prev) =>
-          prev.map((q, idx) => (idx === index ? { ...q, status: "success", progress: 100 } : q))
+          prev.map((q, idx) =>
+            idx === index ? { ...q, status: "success", progress: 100 } : q,
+          ),
         );
         uploadSequentially(index + 1);
       } else {
@@ -185,11 +249,14 @@ export function UploadDialog({
         } catch {}
 
         if (xhr.status === 429) {
-          errorMsg = "Slow down. Upload rate limit exceeded. Please wait a moment.";
+          errorMsg =
+            "Slow down. Upload rate limit exceeded. Please wait a moment.";
         }
 
         setQueue((prev) =>
-          prev.map((q, idx) => (idx === index ? { ...q, status: "error", errorMsg } : q))
+          prev.map((q, idx) =>
+            idx === index ? { ...q, status: "error", errorMsg } : q,
+          ),
         );
         setIsUploading(false);
         toast.error(`Upload failed for ${item.file.name}: ${errorMsg}`);
@@ -199,7 +266,11 @@ export function UploadDialog({
     xhr.onerror = () => {
       activeXhrRef.current = null;
       setQueue((prev) =>
-        prev.map((q, idx) => (idx === index ? { ...q, status: "error", errorMsg: "Network error" } : q))
+        prev.map((q, idx) =>
+          idx === index
+            ? { ...q, status: "error", errorMsg: "Network error" }
+            : q,
+        ),
       );
       setIsUploading(false);
       toast.error(`Network error uploading ${item.file.name}`);
@@ -215,14 +286,20 @@ export function UploadDialog({
     }
     setIsUploading(false);
     setQueue((prev) =>
-      prev.map((q) => (q.status === "uploading" ? { ...q, status: "waiting", progress: 0 } : q))
+      prev.map((q) =>
+        q.status === "uploading" ? { ...q, status: "waiting", progress: 0 } : q,
+      ),
     );
     toast.info("Upload paused");
   };
 
   const handleClose = () => {
     if (isUploading) {
-      if (confirm("Uploading is in progress. Are you sure you want to close and cancel?")) {
+      if (
+        confirm(
+          "Uploading is in progress. Are you sure you want to close and cancel?",
+        )
+      ) {
         cancelUpload();
       } else {
         return;
@@ -241,7 +318,9 @@ export function UploadDialog({
         <div className="flex-1 overflow-y-auto space-y-4 pr-1 py-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field>
-              <FieldLabel htmlFor="upload-folder">Destination Folder</FieldLabel>
+              <FieldLabel htmlFor="upload-folder">
+                Destination Folder
+              </FieldLabel>
               <Input
                 id="upload-folder"
                 value={folderPath}
@@ -256,7 +335,9 @@ export function UploadDialog({
               <FieldLabel htmlFor="upload-visibility">Visibility</FieldLabel>
               <Select
                 value={visibility}
-                onValueChange={(val: "PUBLIC" | "PRIVATE") => setVisibility(val)}
+                onValueChange={(val: "PUBLIC" | "PRIVATE") =>
+                  setVisibility(val)
+                }
                 disabled={isUploading}
               >
                 <SelectTrigger id="upload-visibility">
@@ -273,7 +354,10 @@ export function UploadDialog({
           {visibility === "PUBLIC" && (
             <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
               <div className="space-y-0.5">
-                <label className="text-sm font-medium leading-none" htmlFor="upload-guest-switch">
+                <label
+                  className="text-sm font-medium leading-none"
+                  htmlFor="upload-guest-switch"
+                >
                   Guest Access
                 </label>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -288,6 +372,62 @@ export function UploadDialog({
               />
             </div>
           )}
+
+          <Field>
+            <FieldLabel htmlFor="upload-ttl">Auto Expiration (TTL)</FieldLabel>
+            <div className="flex items-center gap-2">
+              <Select
+                value={ttlPreset}
+                onValueChange={(val: TtlPreset) => setTtlPreset(val)}
+                disabled={isUploading}
+              >
+                <SelectTrigger id="upload-ttl" className="flex-1">
+                  <SelectValue placeholder="Select expiration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="never">Never expires</SelectItem>
+                  <SelectItem value="1h">1 hour</SelectItem>
+                  <SelectItem value="24h">24 hours</SelectItem>
+                  <SelectItem value="7d">7 days</SelectItem>
+                  <SelectItem value="30d">30 days</SelectItem>
+                  <SelectItem value="custom">Custom date…</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {ttlPreset === "custom" && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="justify-start text-left font-normal"
+                      disabled={isUploading}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customExpiry ? (
+                        format(customExpiry, "PP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={customExpiry}
+                      onSelect={setCustomExpiry}
+                      disabled={(date) => date < new Date()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+            <FieldDescription>
+              {ttlPreset === "never"
+                ? "Files are kept until manually deleted."
+                : "Once expired, the file becomes inaccessible and is soft-deleted."}
+            </FieldDescription>
+          </Field>
 
           <div
             onDragEnter={handleDrag}
@@ -332,7 +472,10 @@ export function UploadDialog({
                       <FileIcon className="size-5 text-muted-foreground shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="font-medium truncate max-w-[250px]" title={item.file.name}>
+                          <span
+                            className="font-medium truncate max-w-[250px]"
+                            title={item.file.name}
+                          >
                             {item.file.name}
                           </span>
                           <span className="text-xs text-muted-foreground shrink-0 ml-2">
@@ -358,13 +501,15 @@ export function UploadDialog({
 
                         {item.status === "error" && (
                           <div className="flex items-start text-xs text-destructive gap-1 leading-normal">
-                            <AlertCircle className="size-3.5 shrink-0 mt-0.5" /> 
+                            <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
                             <span>{item.errorMsg || "Upload failed"}</span>
                           </div>
                         )}
 
                         {item.status === "waiting" && (
-                          <span className="text-xs text-muted-foreground">Waiting...</span>
+                          <span className="text-xs text-muted-foreground">
+                            Waiting...
+                          </span>
                         )}
                       </div>
 
@@ -404,7 +549,10 @@ export function UploadDialog({
             <Button
               type="button"
               onClick={startUpload}
-              disabled={queue.length === 0 || queue.every((item) => item.status === "success")}
+              disabled={
+                queue.length === 0 ||
+                queue.every((item) => item.status === "success")
+              }
             >
               Start Uploading
             </Button>
