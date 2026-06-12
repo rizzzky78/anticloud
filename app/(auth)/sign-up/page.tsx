@@ -30,7 +30,7 @@ const schema = z
       .max(30, "Username must be at most 30 characters")
       .regex(
         /^[a-zA-Z0-9_-]+$/,
-        "Only letters, numbers, underscores, and hyphens allowed"
+        "Only letters, numbers, underscores, and hyphens allowed",
       ),
     email: z.string().email("Invalid email address"),
     password: z
@@ -61,8 +61,9 @@ export default function SignUpPage() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const set = (field: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setValues((v) => ({ ...v, [field]: e.target.value }));
+  const set =
+    (field: keyof FormValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setValues((v) => ({ ...v, [field]: e.target.value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,11 +103,13 @@ export default function SignUpPage() {
   };
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-lg">
       <form onSubmit={handleSubmit}>
-        <CardHeader>
+        <CardHeader className="mb-8">
           <CardTitle className="text-2xl">Create account</CardTitle>
-          <CardDescription>Fill in the details below to get started.</CardDescription>
+          <CardDescription>
+            Fill in the details below to get started.
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="grid gap-4">
@@ -121,36 +124,38 @@ export default function SignUpPage() {
             </Alert>
           )}
 
-          <Field data-invalid={!!errors.name}>
-            <FieldLabel htmlFor="name">Full Name</FieldLabel>
-            <Input
-              id="name"
-              type="text"
-              autoComplete="name"
-              value={values.name}
-              onChange={set("name")}
-            />
-            <FieldError>{errors.name}</FieldError>
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field data-invalid={!!errors.name}>
+              <FieldLabel htmlFor="name">Full Name</FieldLabel>
+              <Input
+                id="name"
+                type="text"
+                autoComplete="name"
+                value={values.name}
+                onChange={set("name")}
+              />
+              <FieldError>{errors.name}</FieldError>
+            </Field>
 
-          <Field data-invalid={!!errors.username}>
-            <FieldLabel htmlFor="username">Username</FieldLabel>
-            <Input
-              id="username"
-              type="text"
-              autoComplete="username"
-              value={values.username}
-              onChange={set("username")}
-            />
-            <FieldError>{errors.username}</FieldError>
-          </Field>
+            <Field data-invalid={!!errors.username}>
+              <FieldLabel htmlFor="username">Username</FieldLabel>
+              <Input
+                id="username"
+                type="text"
+                autoComplete="username"
+                value={values.username}
+                onChange={set("username")}
+              />
+              <FieldError>{errors.username}</FieldError>
+            </Field>
+          </div>
 
           <Field data-invalid={!!errors.email}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               type="email"
-              placeholder="m@example.com"
+              placeholder="your@email.com"
               autoComplete="email"
               value={values.email}
               onChange={set("email")}
@@ -158,32 +163,38 @@ export default function SignUpPage() {
             <FieldError>{errors.email}</FieldError>
           </Field>
 
-          <Field data-invalid={!!errors.password}>
-            <FieldLabel htmlFor="password">Password</FieldLabel>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={values.password}
-              onChange={set("password")}
-            />
-            <FieldError>{errors.password}</FieldError>
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field data-invalid={!!errors.password}>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                placeholder="your super secret password"
+                value={values.password}
+                onChange={set("password")}
+              />
+              <FieldError>{errors.password}</FieldError>
+            </Field>
 
-          <Field data-invalid={!!errors.confirmPassword}>
-            <FieldLabel htmlFor="confirmPassword">Confirm Password</FieldLabel>
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={values.confirmPassword}
-              onChange={set("confirmPassword")}
-            />
-            <FieldError>{errors.confirmPassword}</FieldError>
-          </Field>
+            <Field data-invalid={!!errors.confirmPassword}>
+              <FieldLabel htmlFor="confirmPassword">
+                Confirm Password
+              </FieldLabel>
+              <Input
+                id="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                placeholder="type your password again"
+                value={values.confirmPassword}
+                onChange={set("confirmPassword")}
+              />
+              <FieldError>{errors.confirmPassword}</FieldError>
+            </Field>
+          </div>
         </CardContent>
 
-        <CardFooter className="flex-col gap-4">
+        <CardFooter className="flex-col gap-4 mt-12">
           <Button className="w-full" type="submit" disabled={loading}>
             {loading ? (
               <>
