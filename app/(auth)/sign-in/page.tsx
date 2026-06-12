@@ -76,7 +76,7 @@ export default function SignInPage() {
   return (
     <Card className="w-full max-w-sm">
       <form onSubmit={handleSubmit}>
-        <CardHeader>
+        <CardHeader className="mb-8">
           <CardTitle className="text-2xl">Sign in</CardTitle>
           <CardDescription>
             Enter your email or username to access your account.
@@ -100,7 +100,7 @@ export default function SignInPage() {
             <Input
               id="credential"
               type="text"
-              placeholder="m@example.com"
+              placeholder="your@email.com"
               autoComplete="username"
               value={credential}
               onChange={(e) => setCredential(e.target.value)}
@@ -114,6 +114,7 @@ export default function SignInPage() {
               id="password"
               type="password"
               autoComplete="current-password"
+              placeholder="your super secret password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -121,7 +122,7 @@ export default function SignInPage() {
           </Field>
         </CardContent>
 
-        <CardFooter className="flex-col gap-4">
+        <CardFooter className="flex-col gap-4 mt-12">
           <Button className="w-full" type="submit" disabled={loading}>
             {loading ? (
               <>

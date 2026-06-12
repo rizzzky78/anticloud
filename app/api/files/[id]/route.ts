@@ -139,7 +139,9 @@ export async function GET(
     const commonHeaders: Record<string, string> = {
       "Content-Type": file.mimeType,
       "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.displayName)}`,
-      "Cache-Control": "private, no-cache",
+      "Cache-Control": isPreview
+        ? "private, max-age=300, stale-while-revalidate=600"
+        : "private, no-cache",
       // Advertise range support so players (Safari especially) enable seeking.
       "Accept-Ranges": "bytes",
     };
