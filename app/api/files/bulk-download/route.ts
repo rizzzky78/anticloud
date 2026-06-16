@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { getPermittedFiles } from "@/lib/permissions";
 import { getObjectStream } from "@/lib/storage";
 import { Readable } from "node:stream";
-import * as archiver from "archiver";
+import { ZipArchive } from "archiver";
 import { enqueueJob } from "@/lib/jobs";
 
 // Hard-depends on the Node runtime: node:stream (Readable.toWeb), archiver, and
@@ -66,12 +66,13 @@ export async function POST(req: Request) {
     });
 
     // We will build a stream of a ZIP file directly back to the client.
-    const archiverFactory = require("archiver");
+    // archiver v8 exposes named format classes (ESM); the old
+    // `archiver("zip", opts)` factory was removed. Use `new ZipArchive(opts)`.
     // level 0 = store (no compression) for speed; stored blobs are usually
     // already-compressed media, so deflate would only burn CPU.
-    const archive = archiverFactory("zip", {
+    const archive = new ZipArchive({
       zlib: { level: 0 },
-    }) as archiver.Archiver;
+    });
 
     // Per archiver docs, register warning/error handlers before finalize().
     // Warnings (e.g. ENOENT) are non-fatal; a genuine error must destroy the

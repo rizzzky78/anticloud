@@ -36,6 +36,7 @@ import { UploadDialog } from "@/components/upload-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useJobs } from "@/components/jobs-context";
 import { bulkSoftDeleteFiles } from "@/actions/file-config";
+import { canManage } from "@/lib/ui-access";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -154,16 +155,16 @@ export function FileList({
   };
 
   const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
+    if (manageableSelectedIds.length === 0) return;
     setIsDeleting(true);
-    const count = selectedIds.size;
+    const count = manageableSelectedIds.length;
     const toastId = toast.loading(
       `Moving ${count} ${count === 1 ? "file" : "files"} to recycle bin...`,
     );
 
     try {
       const { deleted, failed } = await bulkSoftDeleteFiles({
-        fileIds: Array.from(selectedIds),
+        fileIds: manageableSelectedIds,
       });
 
       if (deleted.length > 0 && failed.length === 0) {
@@ -211,6 +212,20 @@ export function FileList({
 
   const hasContent =
     buckets.some((b) => b.files.length > 0) || subfolders.length > 0;
+
+  // Delete is restricted to files the user owns or can administer. Selection
+  // itself stays open so bulk-download still works on any viewable file, but
+  // the Delete action only ever targets this manageable subset — mirroring the
+  // server-side `assertWriteAccess` check.
+  const fileById = new Map<string, FileListEntry>(
+    buckets.flatMap((b) =>
+      (b.files as FileListEntry[]).map((f) => [f.id, f] as [string, FileListEntry]),
+    ),
+  );
+  const manageableSelectedIds = Array.from(selectedIds).filter((id) => {
+    const file = fileById.get(id);
+    return file ? canManage(file, userId, userRole) : false;
+  });
 
   const handleSuccess = () => {
     router.refresh();
@@ -416,15 +431,17 @@ export function FileList({
             >
               Cancel
             </Button>
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={() => setIsDeleteOpen(true)}
-              disabled={isDownloading || isDeleting}
-              className="text-xs h-8 px-4 rounded-full cursor-pointer gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            >
-              <Trash2 className="size-3.5" /> Delete
-            </Button>
+            {manageableSelectedIds.length > 0 && (
+              <Button
+                variant="outline"
+                size="xs"
+                onClick={() => setIsDeleteOpen(true)}
+                disabled={isDownloading || isDeleting}
+                className="text-xs h-8 px-4 rounded-full cursor-pointer gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-3.5" /> Delete
+              </Button>
+            )}
             <Button
               variant="default"
               size="xs"
@@ -452,15 +469,17 @@ export function FileList({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Move {selectedIds.size}{" "}
-              {selectedIds.size === 1 ? "file" : "files"} to Recycle Bin?
+              Move {manageableSelectedIds.length}{" "}
+              {manageableSelectedIds.length === 1 ? "file" : "files"} to Recycle
+              Bin?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              The selected {selectedIds.size === 1 ? "file" : "files"} will be
+              The selected{" "}
+              {manageableSelectedIds.length === 1 ? "file" : "files"} will be
               moved to the Recycle Bin. You can restore{" "}
-              {selectedIds.size === 1 ? "it" : "them"} within 30 days before
-              permanent deletion. Read-only files and files you don&apos;t own
-              will be skipped.
+              {manageableSelectedIds.length === 1 ? "it" : "them"} within 30 days
+              before permanent deletion. Read-only files and files you
+              don&apos;t own will be skipped.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -10,8 +10,8 @@ export interface AccessUser {
 
 /**
  * Load a file and verify the caller has write-level access:
- *   SUPERADMIN → always allowed.
- *   Owner      → allowed.
+ *   ADMIN or SUPERADMIN (global role) → always allowed.
+ *   Owner/uploader                    → allowed.
  *   Explicit ADMIN or SUPERADMIN file-permission grant → allowed.
  *   Otherwise  → 403.
  *
@@ -29,7 +29,8 @@ export async function assertWriteAccess(
   if (!file) throw AppError.notFound("File not found");
 
   const role = user.role ?? "";
-  if (role === "SUPERADMIN") return file;
+  // Admin-or-above can manage any file; owner can manage their own.
+  if (role === "SUPERADMIN" || role === "ADMIN") return file;
   if (file.ownerId === user.id) return file;
 
   const grant = await db.filePermission.findUnique({

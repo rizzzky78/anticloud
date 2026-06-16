@@ -34,8 +34,10 @@ async function main() {
         });
 
         // 3. Build ZIP
-        const archiverFactory = require("archiver");
-        const archive = archiverFactory("zip", { zlib: { level: 0 } });
+        // archiver v8 ships named format classes (ESM); the old
+        // `archiver("zip", opts)` factory was removed. Use `new ZipArchive(opts)`.
+        const { ZipArchive } = await import("archiver");
+        const archive = new ZipArchive({ zlib: { level: 0 } });
 
         const { PassThrough } = await import("node:stream");
         const passThroughStream = new PassThrough();
