@@ -1,0 +1,34 @@
+# ── VCS / tooling ───────────────────────────────────────────────
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# ── secrets / local env ─────────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# ── build artifacts (regenerated inside the image) ──────────────
+node_modules
+.next
+out
+dist
+
+# ── docker / deploy assets (not needed in build context) ────────
+Dockerfile
+.dockerignore
+docker-compose.yml
+deploy
+
+# ── misc ────────────────────────────────────────────────────────
+npm-debug.log*
+*.log
+.DS_Store
+coverage
+plan
+PROGRESS.md
+*.md
+!STACK.md

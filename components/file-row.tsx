@@ -43,7 +43,8 @@ import {
   Share2,
 } from "lucide-react";
 import { FileListEntry } from "@/lib/file-list";
-import { formatBytes, formatRelativeDate } from "@/lib/format";
+import { formatBytes } from "@/lib/format";
+import { RelativeDate } from "@/components/relative-date";
 import { canManage } from "@/lib/ui-access";
 import { getFileIcon } from "@/components/file-list-types";
 import { FileThumbnail } from "@/components/file-thumbnail";
@@ -295,7 +296,7 @@ export function FileRow({
               {file.displayName}
             </span>
             <span className="text-xs text-muted-foreground sm:hidden">
-              {formatBytes(file.size)} • {formatRelativeDate(file.createdAt)}
+              {formatBytes(file.size)} • <RelativeDate iso={file.createdAt} />
             </span>
           </div>
         </div>
@@ -353,7 +354,7 @@ export function FileRow({
         className="hidden lg:table-cell py-3"
         onClick={() => (window.location.href = `/files/${file.id}`)}
       >
-        {formatRelativeDate(file.createdAt)}
+        <RelativeDate iso={file.createdAt} />
       </TableCell>
       <TableCell className="text-right py-3 p-4">
         <DropdownMenu>
