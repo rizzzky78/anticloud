@@ -143,6 +143,12 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 --ingroup nodejs nodejs
 
 # Full dependency tree (with generated Prisma client) + application source.
+# Copied files stay root-owned but are world-readable/executable by default,
+# which is all the non-root worker needs — it only READS from /app (job output
+# is streamed straight to MinIO, nothing is written to the working directory).
+# A `RUN chown -R /app` here would recurse over the entire node_modules tree:
+# extremely slow on the overlay filesystem and it duplicates every file into a
+# new layer. Avoid it.
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/worker.ts ./worker.ts
 COPY --from=builder /app/lib ./lib
@@ -152,7 +158,6 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/package.json ./package.json
 
-RUN chown -R nodejs:nodejs /app
 USER nodejs
 
 CMD ["bun", "run", "worker.ts"]
