@@ -1,0 +1,35 @@
+# =============================================================================
+# .gitattributes — enforce consistent line endings across OS
+#
+# Windows dev machines use CRLF; Linux containers and Ubuntu Server expect LF.
+# Without this file, shell scripts (generate-cert.sh) and Dockerfiles cloned
+# on Windows get CRLF line endings and BREAK on Linux (/bin/bash: bad interpreter).
+# =============================================================================
+
+# Default: auto-detect (safe for most text files).
+* text=auto
+
+# Force LF for files that MUST have Unix line endings (Docker, shell, configs).
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.dockerfile text eol=lf
+docker-compose.yml text eol=lf
+docker-compose.yaml text eol=lf
+*.conf      text eol=lf
+*.cfg       text eol=lf
+*.env       text eol=lf
+*.env.*     text eol=lf
+Makefile    text eol=lf
+
+# Keep binary files untouched.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.eot  binary
+*.pdf  binary
