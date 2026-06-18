@@ -1,0 +1,151 @@
+# =============================================================================
+# anticloud — Production Docker Compose
+#
+# Target : Linux Ubuntu Server, Docker Engine + Compose V2 plugin
+#
+# Services:
+#   - anticloud-production : Next.js 16 web server (Bun runtime, standalone)
+#   - anticloud-worker     : background job consumer (worker.ts)
+#   - anticloud-nginx      : nginx reverse proxy, terminates HTTPS on :3070
+#
+# Topology:
+#                          host:3070 (HTTPS)
+#                               |
+#                          +----v-----+
+#                          |  nginx   |  (TLS termination, self-signed cert)
+#                          +----+-----+
+#                               | http   (private docker network: anticloud-net)
+#                          +----v-----------------+
+#                          | anticloud-production |  (Next.js on :3000)
+#                          +----+-----------------+
+#                               |   anticloud-worker (same network, no ports)
+#                               | host.docker.internal
+#         +---------------------+---------------------------+
+#     Postgres :5432       Dragonfly :6379            MinIO :9000
+#  (existing containers already running on this host, ports published)
+#
+# The backing services (Postgres, DragonflyDB, MinIO) run in their OWN compose
+# projects on the same host and publish their ports. This app reaches them via
+# `host.docker.internal` (mapped to the docker host gateway), avoiding brittle
+# coupling to those projects' network names.
+#
+# Usage:
+#   cp .env.example .env                         # then edit secrets
+#   bash nginx/generate-cert.sh 10.54.204.59     # create self-signed TLS cert
+#   docker compose --env-file .env up -d --build
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Next.js web application (Bun runtime, standalone build)
+  # ---------------------------------------------------------------------------
+  anticloud-production:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: anticloud-production:latest
+    container_name: anticloud-production
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      - NODE_ENV=production
+      # Internal port nginx proxies to. Keep in sync with nginx upstream.
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      # Apply `prisma migrate deploy` on boot. Set to "false" to skip.
+      - RUN_MIGRATIONS=true
+
+    # Reach host-published services (Postgres/Dragonfly/MinIO) via this hostname.
+    # On Linux, host-gateway resolves to the docker bridge gateway IP. Standard
+    # on Ubuntu Server with Docker Engine — no Docker Desktop required.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - anticloud-net
+
+    # Not published to the host — only nginx (same network) can reach it.
+    expose:
+      - "3000"
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  # ---------------------------------------------------------------------------
+  # Background worker — drains the Redis job queue (compression, bulk archive).
+  # Shares the same source/lockfile as the app but runs worker.ts. It does NOT
+  # apply migrations (the web service owns that) and exposes no ports.
+  # ---------------------------------------------------------------------------
+  anticloud-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    image: anticloud-worker:latest
+    container_name: anticloud-worker
+    restart: unless-stopped
+
+    # Start after the web service has applied migrations and is reachable.
+    depends_on:
+      anticloud-production:
+        condition: service_started
+
+    env_file:
+      - .env
+
+    environment:
+      - NODE_ENV=production
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    networks:
+      - anticloud-net
+
+  # ---------------------------------------------------------------------------
+  # nginx — HTTPS reverse proxy (intranet, self-signed certificate)
+  # Public entrypoint: https://10.54.204.59:3070
+  # ---------------------------------------------------------------------------
+  anticloud-nginx:
+    image: nginx:1.30-alpine
+    container_name: anticloud-nginx
+    restart: unless-stopped
+
+    depends_on:
+      anticloud-production:
+        condition: service_started
+
+    ports:
+      # Host HTTPS port. Matches APP_URL https://10.54.204.59:3070
+      - "${HTTPS_PORT:-3070}:443"
+
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+    networks:
+      - anticloud-net
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "--quiet", "--tries=1", "--spider", "https://localhost:443/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# =============================================================================
+# Private bridge network for app <-> worker <-> nginx traffic only.
+# =============================================================================
+networks:
+  anticloud-net:
+    driver: bridge
+    name: anticloud-net
