@@ -1,5 +1,7 @@
 <div align="center">
 
+![App Logo](public/app-logo.png)
+
 # Anticloud
 
 **A self-hosted, secure file management platform.**
@@ -36,12 +38,12 @@ Anticloud is built around three separations of concern — **identity & access**
 **file lifecycle**, and **metadata intelligence** — with each backing service
 owning exactly one kind of truth:
 
-| Service | Responsibility |
-|---------|----------------|
-| **Better-Auth** | The entry gate. Produces a verified identity that every downstream layer trusts without re-querying the database per request. |
-| **PostgreSQL** | All *relational* truth — ownership, permissions, tags, notes, audit, metadata. Nothing binary ever touches it. |
-| **Object storage (S3)** | All *binary* content. Objects are UUID-keyed; the user-visible name never appears in a storage key. |
-| **Redis** | Short-term memory — sessions, rate-limit counters, hot-data caches, tag-frequency sets, and the background job queue. |
+| Service                 | Responsibility                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Better-Auth**         | The entry gate. Produces a verified identity that every downstream layer trusts without re-querying the database per request. |
+| **PostgreSQL**          | All _relational_ truth — ownership, permissions, tags, notes, audit, metadata. Nothing binary ever touches it.                |
+| **Object storage (S3)** | All _binary_ content. Objects are UUID-keyed; the user-visible name never appears in a storage key.                           |
+| **Redis**               | Short-term memory — sessions, rate-limit counters, hot-data caches, tag-frequency sets, and the background job queue.         |
 
 A few design rules fall out of this:
 
@@ -49,7 +51,7 @@ A few design rules fall out of this:
   database operations. Only an actual binary replacement writes to the bucket.
 - **Permission resolution is centralized and ordered**: superadmin bypass →
   explicit per-file grant → file visibility (public/private) → deny. Mention
-  restrictions further *narrow* access after RBAC. Handlers trust the resolved
+  restrictions further _narrow_ access after RBAC. Handlers trust the resolved
   decision rather than re-checking inline.
 - **The app fails fast** — every secret is validated at boot, so it never runs
   half-configured.
@@ -59,10 +61,11 @@ A few design rules fall out of this:
 ## ✨ Features
 
 ### Files & storage
+
 - **Streamed upload, replace & download** — binaries flow client → handler →
   storage without ever hitting the app server's disk; no size cap by default.
-- **Date-grouped browsing** — list views are bucketed server-side into *Today,
-  Yesterday, This Week, This Month*, then by calendar month — computed in the
+- **Date-grouped browsing** — list views are bucketed server-side into _Today,
+  Yesterday, This Week, This Month_, then by calendar month — computed in the
   query, not in memory.
 - **Bulk download** — select many files and get a single ZIP. Each file's access
   is re-validated individually; excluded files are listed (with the reason) in a
@@ -78,21 +81,23 @@ A few design rules fall out of this:
 - **Folders & display names** fully decoupled from physical storage keys.
 
 ### Access control & sharing
+
 - **Two-level RBAC** — system roles (`SUPERADMIN`, `ADMIN`, `VIEWER`, `GUEST`)
   plus per-file grants. A file owner can grant a specific user a specific role on
-  a specific file; file-level permissions override system-level *downward*, never
+  a specific file; file-level permissions override system-level _downward_, never
   upward.
 - **Visibility modes** — `PUBLIC` / `PRIVATE`, optional **guest access**,
   **read-only** locks (mutations rejected until lifted), and
   **mention-restricted** files (only mentioned users may access, regardless of
   role).
 - **Unowned & orphaned files** — files can exist without an owner; when an owner
-  account is deleted its files become *unowned* (preserved per their visibility)
+  account is deleted its files become _unowned_ (preserved per their visibility)
   rather than cascade-deleted.
 - **Tokenized share links** — permanent, revocable URLs validated against the
-  file's *current* permission state on every request (a token, not a capability).
+  file's _current_ permission state on every request (a token, not a capability).
 
 ### Collaboration
+
 - **Tags** with Redis-backed frequency autocomplete.
 - **@mentions** that notify users in-app — and double as the access grant for
   mention-restricted files.
@@ -100,6 +105,7 @@ A few design rules fall out of this:
   prior versions remain visible to the owner and admins.
 
 ### Search & discovery
+
 - **Full-text search** powered by PostgreSQL `tsvector` + a GIN index, spanning
   file names, tags, and note content.
 - **Permission-scoped results** — search never leaks names or metadata from files
@@ -108,6 +114,7 @@ A few design rules fall out of this:
   composed into a single query.
 
 ### Operations & observability
+
 - **Redis-backed job queue** with a dedicated worker for bulk archiving,
   compression, and TTL expiry. Failed jobs retry with backoff and land in a
   **dead-letter queue** flagged for superadmin review.
@@ -119,6 +126,7 @@ A few design rules fall out of this:
   queue-depth counters in standard exposition format (bearer-token secured).
 
 ### Security
+
 - **Better-Auth** username + password authentication with rate-limited sign-in /
   sign-up and Redis-backed sessions (DB never hit for session validation).
 - **Strict environment contract** — every secret comes from the environment and is
@@ -129,48 +137,70 @@ A few design rules fall out of this:
 
 ## 📸 Screenshots
 
-> The images below are **placeholders**. Drop your own screenshots into
-> [`docs/screenshots/`](docs/screenshots) (overwrite the files, or swap the paths
-> for `.png`s) to make this section real.
+### Files & uploads
 
-|  |  |
-|:--:|:--:|
-| ![Dashboard](docs/screenshots/dashboard.svg) | ![Sign in](docs/screenshots/sign-in.svg) |
-| **Dashboard** — file browser & activity | **Sign in** — animated auth experience |
-| ![File detail](docs/screenshots/file-detail.svg) | ![Search](docs/screenshots/search.svg) |
-| **File detail** — preview, notes, sharing | **Search** — full-text across files & tags |
+Date-grouped file browser with streamed uploads.
 
-<div align="center">
+![File browser](public/app-screenshot/anticloud-page-files-v2.png)
 
-![Admin console](docs/screenshots/admin.svg)
+|                                                               |                                                                                |
+| :-----------------------------------------------------------: | :----------------------------------------------------------------------------: |
+| ![Files list](public/app-screenshot/anticloud-page-files.png) | ![Upload dialog](public/app-screenshot/anticloud-page-files-upload-dialog.png) |
+|                        **Files list**                         |                               **Upload dialog**                                |
 
-**Admin console** — roles, audit log, jobs & recycle bin
+### File detail & collaboration
 
-</div>
+Preview, versioned notes, tags, mentions, and tokenized sharing.
+
+![File detail](public/app-screenshot/anticloud-page-file-detail.png)
+
+|                                                                                 |                                                                                         |
+| :-----------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------: |
+| ![Versioned notes](public/app-screenshot/anticloud-page-files-detail-notes.png) | ![Sharing & permissions](public/app-screenshot/anticloud-page-files-detail-sharing.png) |
+|                               **Versioned notes**                               |                                **Sharing & permissions**                                |
+
+### Search
+
+Permission-scoped full-text search across names, tags, and notes.
+
+![Search](public/app-screenshot/anticloud-page-search.png)
+
+### Authentication
+
+![Sign in](public/app-screenshot/anticloud-login-page.png)
+
+### Admin console
+
+|                                                                                    |                                                                            |
+| :--------------------------------------------------------------------------------: | :------------------------------------------------------------------------: |
+|   ![User management](public/app-screenshot/anticloud-page-users-management.png)    |  ![Audit log](public/app-screenshot/anticloud-page-admin-audit-logs.png)   |
+|                             **User & role management**                             |                         **Append-only audit log**                          |
+| ![Background jobs](public/app-screenshot/anticloud-page-admin-background-jobs.png) | ![Recycle bin](public/app-screenshot/anticloud-page-admin-recycle-bin.png) |
+|                      **Background jobs & dead-letter queue**                       |                    **Recycle bin (soft-deleted files)**                    |
 
 ---
 
 ## 🧱 Tech stack
 
-| Layer | Choice |
-|-------|--------|
-| Framework | [Next.js 16](https://nextjs.org) (App Router) + [React 19](https://react.dev) |
-| Language | TypeScript |
-| Runtime | [Bun](https://bun.sh) |
-| Styling | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
-| Auth | [Better-Auth](https://better-auth.com) |
-| Database | PostgreSQL via [Prisma 7](https://www.prisma.io) (driver adapter) |
-| Cache / queue | Redis via [ioredis](https://github.com/redis/ioredis) |
-| Object storage | S3-compatible via the [MinIO SDK](https://min.io) (MinIO, R2, AWS S3, …) |
-| Motion / UI | GSAP, Recharts, dnd-kit, media-chrome |
+| Layer          | Choice                                                                          |
+| -------------- | ------------------------------------------------------------------------------- |
+| Framework      | [Next.js 16](https://nextjs.org) (App Router) + [React 19](https://react.dev)   |
+| Language       | TypeScript                                                                      |
+| Runtime        | [Bun](https://bun.sh)                                                           |
+| Styling        | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) |
+| Auth           | [Better-Auth](https://better-auth.com)                                          |
+| Database       | PostgreSQL via [Prisma 7](https://www.prisma.io) (driver adapter)               |
+| Cache / queue  | Redis via [ioredis](https://github.com/redis/ioredis)                           |
+| Object storage | S3-compatible via the [MinIO SDK](https://min.io) (MinIO, R2, AWS S3, …)        |
+| Motion / UI    | GSAP, Recharts, dnd-kit, media-chrome                                           |
 
 Each backing service can be **local or cloud**:
 
-| Service | Local | Cloud |
-|---------|-------|-------|
-| PostgreSQL | Postgres container | Neon, Supabase, RDS, … |
-| Redis | Redis container | Upstash, … (`rediss://`) |
-| Object storage | MinIO container | Cloudflare R2, AWS S3, Backblaze B2, … |
+| Service        | Local              | Cloud                                  |
+| -------------- | ------------------ | -------------------------------------- |
+| PostgreSQL     | Postgres container | Neon, Supabase, RDS, …                 |
+| Redis          | Redis container    | Upstash, … (`rediss://`)               |
+| Object storage | MinIO container    | Cloudflare R2, AWS S3, Backblaze B2, … |
 
 ---
 
@@ -240,23 +270,23 @@ All configuration is environment variables, documented in
 [`lib/env.ts`](lib/env.ts). A missing or malformed value fails fast with a
 readable error.
 
-| Variable | Required | Description |
-|----------|:--------:|-------------|
-| `NODE_ENV` | – | `development` \| `test` \| `production` |
-| `DATABASE_URL` | ✅ | PostgreSQL connection string. Cloud DBs usually need `?sslmode=require`. |
-| `REDIS_URL` | ✅ | Redis connection string. Use `rediss://` for TLS (e.g. Upstash). |
-| `MINIO_ENDPOINT` | ✅ | Storage host (e.g. `localhost`, or `<id>.r2.cloudflarestorage.com`). |
-| `MINIO_PORT` | ✅ | Storage port (`9000` for MinIO, `443` for cloud). |
-| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | ✅ | Storage credentials. |
-| `MINIO_BUCKET` | ✅ | Bucket name (auto-created on boot if missing). |
-| `MINIO_USE_SSL` | ✅ | `true` for HTTPS storage, `false` for local HTTP. |
-| `MINIO_REGION` | – | Cloud only — e.g. `auto` (R2) or `us-east-1` (AWS). |
-| `MINIO_PATH_STYLE` | – | Override addressing style; leave unset to auto-detect. |
-| `BETTER_AUTH_SECRET` | ✅ | 32+ char random secret for signing sessions. |
-| `BETTER_AUTH_URL` | ✅ | Public base URL Better-Auth runs under (no trailing slash). |
-| `APP_URL` | ✅ | Public base URL of the app. |
-| `CRON_SECRET` | – | Bearer token guarding the TTL-expiry cron endpoint. |
-| `SUPERADMIN_*` | – | Optional non-interactive bootstrap for the first admin. |
+| Variable                                | Required | Description                                                              |
+| --------------------------------------- | :------: | ------------------------------------------------------------------------ |
+| `NODE_ENV`                              |    –     | `development` \| `test` \| `production`                                  |
+| `DATABASE_URL`                          |    ✅    | PostgreSQL connection string. Cloud DBs usually need `?sslmode=require`. |
+| `REDIS_URL`                             |    ✅    | Redis connection string. Use `rediss://` for TLS (e.g. Upstash).         |
+| `MINIO_ENDPOINT`                        |    ✅    | Storage host (e.g. `localhost`, or `<id>.r2.cloudflarestorage.com`).     |
+| `MINIO_PORT`                            |    ✅    | Storage port (`9000` for MinIO, `443` for cloud).                        |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` |    ✅    | Storage credentials.                                                     |
+| `MINIO_BUCKET`                          |    ✅    | Bucket name (auto-created on boot if missing).                           |
+| `MINIO_USE_SSL`                         |    ✅    | `true` for HTTPS storage, `false` for local HTTP.                        |
+| `MINIO_REGION`                          |    –     | Cloud only — e.g. `auto` (R2) or `us-east-1` (AWS).                      |
+| `MINIO_PATH_STYLE`                      |    –     | Override addressing style; leave unset to auto-detect.                   |
+| `BETTER_AUTH_SECRET`                    |    ✅    | 32+ char random secret for signing sessions.                             |
+| `BETTER_AUTH_URL`                       |    ✅    | Public base URL Better-Auth runs under (no trailing slash).              |
+| `APP_URL`                               |    ✅    | Public base URL of the app.                                              |
+| `CRON_SECRET`                           |    –     | Bearer token guarding the TTL-expiry cron endpoint.                      |
+| `SUPERADMIN_*`                          |    –     | Optional non-interactive bootstrap for the first admin.                  |
 
 ### Switching a service between local and cloud
 
