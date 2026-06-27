@@ -40,3 +40,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+PROGRESS.md
+AGENTS.md
+DESCRIPTION_PLAN.md
+STACK.md
+/plan
+
+# nginx TLS material + ACME challenges (keep the dirs, ignore the contents)
+/deploy/nginx/certs/*
+!/deploy/nginx/certs/.gitkeep
+/deploy/nginx/acme/*
+!/deploy/nginx/acme/.gitkeep

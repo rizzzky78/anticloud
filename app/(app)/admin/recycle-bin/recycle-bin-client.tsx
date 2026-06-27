@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, RotateCcw, Loader2, FileIcon, Trash2, Clock } from "lucide-react";
+import {
+  Search,
+  RotateCcw,
+  Loader2,
+  FileIcon,
+  Trash2,
+  Clock,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -40,7 +47,7 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
 
   // Filter files by search term
   const filteredFiles = files.filter((f) =>
-    f.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+    f.displayName.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const getRemainingTime = (deletedAtStr: string) => {
@@ -62,7 +69,10 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
 
     const hours = Math.floor(remainingMs / (1000 * 60 * 60));
     if (hours > 0) {
-      return { text: `${hours} ${hours === 1 ? "hour" : "hours"} left`, variant: "destructive" as const };
+      return {
+        text: `${hours} ${hours === 1 ? "hour" : "hours"} left`,
+        variant: "destructive" as const,
+      };
     }
 
     return { text: "< 1 hour left", variant: "destructive" as const };
@@ -72,10 +82,10 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
     startTransition(async () => {
       try {
         await recoverFile({ fileId });
-        
+
         // Remove from local list
         setFiles((prev) => prev.filter((f) => f.id !== fileId));
-        
+
         toast.success(`Successfully restored "${displayName}"`);
         router.refresh();
       } catch (err: any) {
@@ -92,14 +102,14 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
           placeholder="Search deleted files by name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
+          className="pl-9 border-0"
         />
       </div>
 
       <Card className="border border-border/80 shadow-md">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/30">
+            <TableHeader className="">
               <TableRow>
                 <TableHead className="w-[300px]">File Name</TableHead>
                 <TableHead>Size</TableHead>
@@ -112,10 +122,15 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
             <TableBody>
               {filteredFiles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={6}
+                    className="h-32 pt-8 text-center text-muted-foreground"
+                  >
                     <div className="flex flex-col items-center justify-center space-y-1">
                       <Trash2 className="size-8 text-muted-foreground/30 stroke-[1.5]" />
-                      <span className="text-sm font-medium">Recycle bin is empty</span>
+                      <span className="text-sm font-medium">
+                        Recycle bin is empty
+                      </span>
                       <span className="text-xs text-muted-foreground/80">
                         No soft-deleted files were found.
                       </span>
@@ -149,7 +164,10 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
                         {formatDate(file.deletedAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={remaining.variant} className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5">
+                        <Badge
+                          variant={remaining.variant}
+                          className="gap-1 text-[10px] uppercase font-bold tracking-wider py-0.5"
+                        >
                           <Clock className="size-3" />
                           {remaining.text}
                         </Badge>
@@ -157,18 +175,26 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
                       <TableCell className="text-sm text-muted-foreground">
                         {file.owner ? (
                           <div className="flex flex-col">
-                            <span className="text-foreground text-xs font-medium">{file.owner.name}</span>
-                            <span className="text-[10px]">{file.owner.email}</span>
+                            <span className="text-foreground text-xs font-medium">
+                              {file.owner.name}
+                            </span>
+                            <span className="text-[10px]">
+                              {file.owner.email}
+                            </span>
                           </div>
                         ) : (
-                          <span className="italic text-xs">System / Unowned</span>
+                          <span className="italic text-xs">
+                            System / Unowned
+                          </span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="outline"
                           size="xs"
-                          onClick={() => handleRestore(file.id, file.displayName)}
+                          onClick={() =>
+                            handleRestore(file.id, file.displayName)
+                          }
                           disabled={isPending}
                           className="h-8 gap-1.5 cursor-pointer text-primary border-primary/20 hover:bg-primary/5 hover:text-primary"
                         >

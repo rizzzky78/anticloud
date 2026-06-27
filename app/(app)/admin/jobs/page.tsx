@@ -18,10 +18,17 @@ export default async function AdminJobsPage() {
 
   // Fetch telemetry metrics
   const queueDepth = await redis.llen(redisKey(NS.job, "queue")).catch(() => 0);
-  const cacheHits = parseInt((await redis.get("metrics:cache_hits_total")) || "0", 10);
-  const cacheMisses = parseInt((await redis.get("metrics:cache_misses_total")) || "0", 10);
+  const cacheHits = parseInt(
+    (await redis.get("metrics:cache_hits_total")) || "0",
+    10,
+  );
+  const cacheMisses = parseInt(
+    (await redis.get("metrics:cache_misses_total")) || "0",
+    10,
+  );
   const totalCacheLookups = cacheHits + cacheMisses;
-  const cacheHitRate = totalCacheLookups > 0 ? (cacheHits / totalCacheLookups) * 100 : 0;
+  const cacheHitRate =
+    totalCacheLookups > 0 ? (cacheHits / totalCacheLookups) * 100 : 0;
 
   // Fetch recent background jobs
   const jobs = await db.job.findMany({
@@ -48,13 +55,15 @@ export default async function AdminJobsPage() {
   }));
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="flex-1 space-y-6 w-full mx-auto">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <BriefcaseIcon className="size-6 text-primary" /> Background Jobs Console
+          <BriefcaseIcon className="size-6 text-primary" /> Background Jobs
+          Console
         </h1>
         <p className="text-muted-foreground text-sm">
-          SUPERADMIN Console: Monitor system tasks, retries, and check Dead Letter Queues (DLQ).
+          SUPERADMIN Console: Monitor system tasks, retries, and check Dead
+          Letter Queues (DLQ).
         </p>
       </div>
 

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="Admin Console placeholder">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1120"/>
+      <stop offset="1" stop-color="#020617"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1232" height="672" rx="16" fill="none" stroke="#1e293b" stroke-width="2" stroke-dasharray="10 8"/>
+  <g fill="#334155">
+    <circle cx="612" cy="300" r="46" fill="none" stroke="#475569" stroke-width="6"/>
+    <path d="M590 300h44M612 278v44" stroke="#475569" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <text x="640" y="420" text-anchor="middle" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,Arial" font-size="40" font-weight="700" fill="#e2e8f0">Admin Console</text>
+  <text x="640" y="464" text-anchor="middle" font-family="ui-sans-serif,system-ui,Segoe UI,Roboto,Arial" font-size="20" fill="#64748b">User roles, audit log, background jobs & recycle bin</text>
+  <text x="640" y="660" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="15" fill="#475569">docs/screenshots/admin.svg — replace with a real screenshot (1280×720)</text>
+</svg>

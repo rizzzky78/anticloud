@@ -16,12 +16,20 @@ const globalForStorage = globalThis as unknown as {
 };
 
 function createClient(): Client {
+  // The minio SDK is plain-S3, so this same client talks to a local MinIO
+  // server OR a cloud provider (R2 / AWS S3 / B2). `region` and `pathStyle` are
+  // only forwarded when set — for local MinIO they stay unset and the SDK uses
+  // its sensible defaults; for cloud storage they come from the environment.
   return new Client({
     endPoint: env.MINIO_ENDPOINT,
     port: env.MINIO_PORT,
     useSSL: env.MINIO_USE_SSL,
     accessKey: env.MINIO_ACCESS_KEY,
     secretKey: env.MINIO_SECRET_KEY,
+    ...(env.MINIO_REGION ? { region: env.MINIO_REGION } : {}),
+    ...(env.MINIO_PATH_STYLE !== undefined
+      ? { pathStyle: env.MINIO_PATH_STYLE }
+      : {}),
   });
 }
 

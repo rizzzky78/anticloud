@@ -11,21 +11,23 @@ export default async function AdminUsersPage() {
   const users = await getUsers();
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-6xl mx-auto">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <UsersIcon className="size-6 text-primary" /> User Role Management
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          View all registered users and manage their system access roles.
-        </p>
-      </div>
+    <div className="">
+      <div className="flex-1 space-y-6 w-full mx-auto">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <UsersIcon className="size-6 text-primary" /> User Role Management
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            View all registered users and manage their system access roles.
+          </p>
+        </div>
 
-      <UsersTableClient
-        initialUsers={users}
-        currentUserRole={currentUser?.role as string}
-        currentUserId={currentUser?.id as string}
-      />
+        <UsersTableClient
+          initialUsers={users}
+          currentUserRole={currentUser?.role as string}
+          currentUserId={currentUser?.id as string}
+        />
+      </div>
     </div>
   );
 }

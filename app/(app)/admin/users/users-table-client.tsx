@@ -2,7 +2,14 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Shield, ShieldAlert, User, ShieldCheck, Loader2 } from "lucide-react";
+import {
+  Search,
+  Shield,
+  ShieldAlert,
+  User,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -86,25 +93,37 @@ export function UsersTableClient({
     switch (role) {
       case "SUPERADMIN":
         return (
-          <Badge variant="outline" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-400 text-zinc-900 bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:bg-zinc-900">
+          <Badge
+            variant="outline"
+            className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-400 text-zinc-900 bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:bg-zinc-900"
+          >
             <ShieldAlert className="size-3 text-zinc-500" /> Superadmin
           </Badge>
         );
       case "ADMIN":
         return (
-          <Badge variant="outline" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50">
+          <Badge
+            variant="outline"
+            className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50"
+          >
             <ShieldCheck className="size-3 text-zinc-500" /> Admin
           </Badge>
         );
       case "VIEWER":
         return (
-          <Badge variant="secondary" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider">
+          <Badge
+            variant="secondary"
+            className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider"
+          >
             <User className="size-3" /> Viewer
           </Badge>
         );
       case "GUEST":
         return (
-          <Badge variant="outline" className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider">
+          <Badge
+            variant="outline"
+            className="gap-1 flex items-center w-fit text-[10px] uppercase font-bold tracking-wider"
+          >
             <User className="size-3 text-muted-foreground" /> Guest
           </Badge>
         );
@@ -135,10 +154,10 @@ export function UsersTableClient({
     startTransition(async () => {
       try {
         await setSystemRole({ userId, newRole });
-        
+
         // Update local state
         setUsers((prev) =>
-          prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+          prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
         );
 
         toast.success(`Successfully updated ${userName}'s role to ${newRole}`);
@@ -158,7 +177,8 @@ export function UsersTableClient({
     if (targetUser.id === currentUserId) return false;
 
     // Only SUPERADMIN can modify a SUPERADMIN
-    if (targetUser.role === "SUPERADMIN" && currentUserRole !== "SUPERADMIN") return false;
+    if (targetUser.role === "SUPERADMIN" && currentUserRole !== "SUPERADMIN")
+      return false;
 
     // Only SUPERADMIN/ADMIN can modify system roles
     return currentUserRole === "SUPERADMIN" || currentUserRole === "ADMIN";
@@ -167,7 +187,8 @@ export function UsersTableClient({
   // Check if option is selectable
   const isOptionDisabled = (roleOption: Role) => {
     // Only SUPERADMIN can grant SUPERADMIN role
-    if (roleOption === "SUPERADMIN" && currentUserRole !== "SUPERADMIN") return true;
+    if (roleOption === "SUPERADMIN" && currentUserRole !== "SUPERADMIN")
+      return true;
     return false;
   };
 
@@ -179,14 +200,14 @@ export function UsersTableClient({
           placeholder="Search users by name, email or username..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
+          className="pl-9 border-0"
         />
       </div>
 
       <Card className="border border-border/80 shadow-md">
         <CardContent className="p-0">
           <Table>
-            <TableHeader className="bg-muted/30">
+            <TableHeader className="">
               <TableRow>
                 <TableHead className="w-[250px]">User</TableHead>
                 <TableHead>Username</TableHead>
@@ -198,7 +219,10 @@ export function UsersTableClient({
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell
+                    colSpan={5}
+                    className="h-32 text-center text-muted-foreground"
+                  >
                     No users found matching your search.
                   </TableCell>
                 </TableRow>
@@ -208,11 +232,17 @@ export function UsersTableClient({
                   const editable = canModifyRole(user);
 
                   return (
-                    <TableRow key={user.id} className={isCurrent ? "bg-muted/10" : ""}>
+                    <TableRow
+                      key={user.id}
+                      className={isCurrent ? "bg-muted/10" : ""}
+                    >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
                           <Avatar className="size-9 border border-border">
-                            <AvatarImage src={user.image ?? undefined} alt={user.name} />
+                            <AvatarImage
+                              src={user.image ?? undefined}
+                              alt={user.name}
+                            />
                             <AvatarFallback className="font-semibold text-xs">
                               {user.name.slice(0, 2).toUpperCase()}
                             </AvatarFallback>
@@ -221,7 +251,10 @@ export function UsersTableClient({
                             <span className="truncate flex items-center gap-1.5">
                               {user.name}
                               {isCurrent && (
-                                <Badge variant="secondary" className="px-1 py-0 text-[9px] font-medium leading-none">
+                                <Badge
+                                  variant="secondary"
+                                  className="px-1 py-0 text-[9px] font-medium leading-none"
+                                >
                                   You
                                 </Badge>
                               )}
@@ -243,30 +276,46 @@ export function UsersTableClient({
                         {editable ? (
                           <Select
                             defaultValue={user.role}
-                            onValueChange={(val) => handleRoleSelect(user.id, val as Role)}
+                            onValueChange={(val) =>
+                              handleRoleSelect(user.id, val as Role)
+                            }
                             disabled={isPending}
                           >
                             <SelectTrigger className="w-[140px] h-8 text-xs inline-flex cursor-pointer">
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="SUPERADMIN" disabled={isOptionDisabled("SUPERADMIN")}>
+                              <SelectItem
+                                value="SUPERADMIN"
+                                disabled={isOptionDisabled("SUPERADMIN")}
+                              >
                                 Superadmin
                               </SelectItem>
-                              <SelectItem value="ADMIN" disabled={isOptionDisabled("ADMIN")}>
+                              <SelectItem
+                                value="ADMIN"
+                                disabled={isOptionDisabled("ADMIN")}
+                              >
                                 Admin
                               </SelectItem>
-                              <SelectItem value="VIEWER" disabled={isOptionDisabled("VIEWER")}>
+                              <SelectItem
+                                value="VIEWER"
+                                disabled={isOptionDisabled("VIEWER")}
+                              >
                                 Viewer
                               </SelectItem>
-                              <SelectItem value="GUEST" disabled={isOptionDisabled("GUEST")}>
+                              <SelectItem
+                                value="GUEST"
+                                disabled={isOptionDisabled("GUEST")}
+                              >
                                 Guest
                               </SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
                           <span className="text-xs text-muted-foreground italic pr-4">
-                            {isCurrent ? "Cannot change self" : "Insufficient access"}
+                            {isCurrent
+                              ? "Cannot change self"
+                              : "Insufficient access"}
                           </span>
                         )}
                       </TableCell>
@@ -288,9 +337,13 @@ export function UsersTableClient({
               Confirm Role Change
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to change <strong>{pendingChange?.userName}</strong>'s role
-              from <strong className="uppercase">{pendingChange?.oldRole}</strong> to{" "}
-              <strong className="uppercase text-foreground font-bold">{pendingChange?.newRole}</strong>?
+              Are you sure you want to change{" "}
+              <strong>{pendingChange?.userName}</strong>'s role from{" "}
+              <strong className="uppercase">{pendingChange?.oldRole}</strong> to{" "}
+              <strong className="uppercase text-foreground font-bold">
+                {pendingChange?.newRole}
+              </strong>
+              ?
               <br />
               This will update their system-wide access permissions immediately.
             </AlertDialogDescription>

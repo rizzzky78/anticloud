@@ -22,13 +22,14 @@ export default async function AdminAuditPage() {
   });
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="flex-1 space-y-6 w-full mx-auto">
       <div className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <FileText className="size-6 text-primary" /> Security Audit Logs
         </h1>
         <p className="text-muted-foreground text-sm">
-          SUPERADMIN Console: Monitor access patterns, privilege changes, and file system mutations.
+          SUPERADMIN Console: Monitor access patterns, privilege changes, and
+          file system mutations.
         </p>
       </div>
 

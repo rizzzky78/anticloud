@@ -21,7 +21,11 @@ const envSchema = z.object({
   // Redis / Dragonfly — consumed by `lib/redis.ts`.
   REDIS_URL: z.url({ message: "must be a valid redis connection URL" }),
 
-  // MinIO — consumed only by `lib/storage.ts`.
+  // Object storage (S3-compatible) — consumed only by `lib/storage.ts`.
+  // The `minio` SDK speaks plain S3, so the SAME variables point at either a
+  // local MinIO server OR a cloud provider (Cloudflare R2, AWS S3, Backblaze
+  // B2, …). Only the endpoint/port/SSL change; for cloud you additionally set
+  // MINIO_REGION (and usually MINIO_USE_SSL=true, MINIO_PORT=443).
   MINIO_ENDPOINT: z.string().min(1, "is required"),
   MINIO_PORT: z.coerce
     .number()
@@ -32,6 +36,13 @@ const envSchema = z.object({
   MINIO_SECRET_KEY: z.string().min(1, "is required"),
   MINIO_BUCKET: z.string().min(1, "is required"),
   MINIO_USE_SSL: z.stringbool().default(false),
+  // Optional — only needed for cloud storage. Examples: "auto" (R2),
+  // "us-east-1" (AWS). Leave unset for a local MinIO server.
+  MINIO_REGION: z.string().min(1).optional(),
+  // Optional — addressing style. Local MinIO & R2 use path-style (default true
+  // for non-AWS endpoints in the SDK); AWS S3 uses virtual-hosted style. Only
+  // set this to override the SDK's auto-detection.
+  MINIO_PATH_STYLE: z.stringbool().optional(),
 
   // Better-Auth.
   BETTER_AUTH_SECRET: z

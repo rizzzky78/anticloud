@@ -49,17 +49,20 @@ export default async function AdminRecycleBinPage() {
   }));
 
   return (
-    <div className="flex-1 space-y-6 p-4 md:p-8 max-w-6xl mx-auto">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Trash2Icon className="size-6 text-primary" /> Recycle Bin
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          SUPERADMIN Console: Recover soft-deleted files within their 30-day grace window.
-        </p>
-      </div>
+    <div className="">
+      <div className="flex-1 space-y-6 w-full mx-auto xl:col-span-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            <Trash2Icon className="size-6 text-primary" /> Recycle Bin
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            SUPERADMIN Console: Recover soft-deleted files within their 30-day
+            grace window.
+          </p>
+        </div>
 
-      <RecycleBinClient initialFiles={serializedFiles} />
+        <RecycleBinClient initialFiles={serializedFiles} />
+      </div>
     </div>
   );
 }
