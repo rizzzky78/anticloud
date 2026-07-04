@@ -32,6 +32,19 @@ Cloudflare R2, …). The application code is identical either way.
 
 ---
 
+## 🎯 Purpose & intent
+
+Anticloud was built as a from-scratch demonstration of what it takes to ship a
+"boring" cloud-storage product properly: real RBAC instead of a single owner
+flag, a permission model that survives account deletion, background job
+processing with a dead-letter queue instead of fire-and-forget async work, and
+an audit trail that can't be edited after the fact. It's a portfolio project
+first — there's no commercial backing or SLA — but the backend concerns
+(permissions, storage decoupling, observability) are treated with production
+seriousness rather than mocked out.
+
+---
+
 ## 🏛️ Architecture
 
 Anticloud is built around three separations of concern — **identity & access**,
@@ -132,6 +145,48 @@ A few design rules fall out of this:
 - **Strict environment contract** — every secret comes from the environment and is
   validated at boot; the app refuses to start half-configured.
 - **No SQL injection surface** — all data access goes through Prisma.
+
+---
+
+## 🧭 How it works
+
+A new visitor lands on [Sign In](<app/(auth)/sign-in/README.md>) (or
+[Sign Up](<app/(auth)/sign-up/README.md>) to register). Once authenticated,
+`/` redirects straight into [Files](<app/(app)/files/README.md>), the
+date-grouped file browser and home base of the app — upload, organize into
+folders, and select files for bulk actions from here. Opening any file leads to
+its [File Detail](<app/(app)/files/[id]/README.md>) page, where preview,
+sharing, tags, mentions, and versioned notes all live. When the library grows,
+[Search](<app/(app)/search/README.md>) finds files by name, tag, or type across
+the whole account. [Notifications](<app/(app)/notifications/README.md>) surfaces
+mentions and collaborator activity, and anything deleted passes through the
+[Recycle Bin](<app/(app)/trash/README.md>) before it's gone for good.
+[Settings](<app/(app)/settings/README.md>) covers profile, theme, and signing
+out. Admins and superadmins get an additional console —
+[Users & Roles](<app/(app)/admin/users/README.md>),
+[Audit Logs](<app/(app)/admin/audit/README.md>),
+[Background Jobs](<app/(app)/admin/jobs/README.md>), and a system-wide
+[Recycle Bin](<app/(app)/admin/recycle-bin/README.md>) — visible only to those
+roles.
+
+## 🗺️ Pages
+
+| Page                 | Route                  | Description                                                | Doc                                                            |
+| -------------------- | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| Sign In               | `/sign-in`              | Authenticate with email/username + password                  | [README](<app/(auth)/sign-in/README.md>)                        |
+| Sign Up               | `/sign-up`              | Register a new account                                       | [README](<app/(auth)/sign-up/README.md>)                        |
+| Files                 | `/files`                | Date-grouped file browser, upload, bulk actions               | [README](<app/(app)/files/README.md>)                           |
+| File Detail           | `/files/[id]`           | Preview, sharing, tags, mentions, versioned notes             | [README](<app/(app)/files/[id]/README.md>)                      |
+| Search                | `/search`               | Full-text search by name, tag, or file type                  | [README](<app/(app)/search/README.md>)                          |
+| Notifications         | `/notifications`        | Mentions and collaborator activity feed                      | [README](<app/(app)/notifications/README.md>)                   |
+| Recycle Bin           | `/trash`                | Restore your own soft-deleted files within 30 days            | [README](<app/(app)/trash/README.md>)                           |
+| Settings & Account    | `/settings`             | Profile, theme, session, sign out                              | [README](<app/(app)/settings/README.md>)                        |
+| Users & Roles (admin) | `/admin/users`          | Manage every user's system role                               | [README](<app/(app)/admin/users/README.md>)                     |
+| Audit Logs (admin)    | `/admin/audit`          | Append-only security audit trail (superadmin-only)             | [README](<app/(app)/admin/audit/README.md>)                     |
+| Background Jobs (admin) | `/admin/jobs`         | Queue health, job status, dead-letter queue (superadmin-only)  | [README](<app/(app)/admin/jobs/README.md>)                      |
+| Recycle Bin (admin)   | `/admin/recycle-bin`    | System-wide soft-deleted file recovery (superadmin-only)        | [README](<app/(app)/admin/recycle-bin/README.md>)               |
+| Dashboard *(unused)*  | `/dashboard`            | Leftover shadcn demo scaffold, not linked in navigation        | [README](app/dashboard/README.md)                               |
+| Dashboard Search *(unused)* | `/dashboard/search` | Same Search component, reused under the unused scaffold        | [README](app/dashboard/search/README.md)                        |
 
 ---
 
@@ -373,3 +428,19 @@ existing conventions (kebab-case files, PascalCase components, server actions in
 No license file is included yet. Until a `LICENSE` is added, all rights are
 reserved by the maintainers — add one (e.g. MIT, Apache-2.0) to make the intended
 open-source terms explicit.
+
+---
+
+## 💼 Portfolio summary
+
+Anticloud is a self-hosted, Nextcloud-style file management platform built on
+Next.js 16, Prisma/PostgreSQL, Redis, and S3-compatible storage — every backing
+service swappable between a local Docker container and a managed cloud
+provider with no code changes. It implements two-level RBAC with per-file
+grants and visibility modes, tokenized share links, tagging and @mentions,
+versioned notes, full-text search, a Redis-backed background job queue with
+dead-letter handling, and an append-only audit log, all behind a Better-Auth
+session layer. The standout engineering is in the details normally skipped in
+demo projects: permission resolution ordering, orphaned-file handling on
+account deletion, non-destructive on-demand compression, and Prometheus
+metrics for queue and cache health.
