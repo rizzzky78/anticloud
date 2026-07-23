@@ -64,4 +64,9 @@ export const auth = betterAuth({
   },
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
+  // APP_URL plus any additional addresses the app answers on (e.g. a second IP).
+  trustedOrigins: [
+    env.APP_URL,
+    ...(env.TRUSTED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? []),
+  ],
 });

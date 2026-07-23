@@ -36,7 +36,6 @@
 # =============================================================================
 
 services:
-
   # ---------------------------------------------------------------------------
   # Next.js web application (Bun runtime, standalone build)
   # ---------------------------------------------------------------------------
@@ -74,7 +73,15 @@ services:
       - "3000"
 
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -113,7 +120,6 @@ services:
 
   # ---------------------------------------------------------------------------
   # nginx — HTTPS reverse proxy (intranet, self-signed certificate)
-  # Public entrypoint: https://10.54.204.59:3070
   # ---------------------------------------------------------------------------
   anticloud-nginx:
     image: nginx:1.30-alpine
@@ -125,7 +131,6 @@ services:
         condition: service_started
 
     ports:
-      # Host HTTPS port. Matches APP_URL https://10.54.204.59:3070
       - "${HTTPS_PORT:-3070}:443"
 
     volumes:
@@ -136,7 +141,16 @@ services:
       - anticloud-net
 
     healthcheck:
-      test: ["CMD", "wget", "--no-check-certificate", "--quiet", "--tries=1", "--spider", "https://localhost:443/"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-check-certificate",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "https://localhost:443/",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3

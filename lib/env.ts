@@ -52,6 +52,10 @@ const envSchema = z.object({
 
   // Application.
   APP_URL: z.url({ message: "must be a valid URL" }),
+  // Extra origins allowed to make auth requests, comma-separated. Needed when
+  // the app is reachable at more than one address (e.g. two intranet IPs).
+  // APP_URL is always trusted; list the OTHER origins here. Optional.
+  TRUSTED_ORIGINS: z.string().optional(),
   CRON_SECRET: z.string().default("development_secret_change_me"),
 });
 
