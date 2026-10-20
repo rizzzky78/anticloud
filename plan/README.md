@@ -22,6 +22,19 @@ This plan is split into **phases**. Each phase is a self-contained file with ord
 | 8 | Search | [phase-08-search.md](phase-08-search.md) | 6, 7 | 6 |
 | 9 | Jobs · Bulk Download · Compression | [phase-09-jobs-bulk-compression.md](phase-09-jobs-bulk-compression.md) | 3, 5 | 10, 11, 14 |
 | 10 | Audit & Observability | [phase-10-audit-observability.md](phase-10-audit-observability.md) | 1 | 15 |
+| 11 | Security Hardening | [phase-11-security-hardening.md](phase-11-security-hardening.md) | 0–10 | review |
+| 12 | Reliability & Maintenance | [phase-12-reliability.md](phase-12-reliability.md) | 11 | review |
+| 13 | File Versions | [phase-13-file-versions.md](phase-13-file-versions.md) | 12 | — |
+| 14 | Sharing v2 (users + links) | [phase-14-sharing.md](phase-14-sharing.md) | 13 | — |
+| 15 | Groups | [phase-15-groups.md](phase-15-groups.md) | 14 | — |
+| 16 | Folders as Entities | [phase-16-folders.md](phase-16-folders.md) | 15 | — |
+| 17 | Personal Views & Browser UX | [phase-17-browser-ux.md](phase-17-browser-ux.md) | 16 | — |
+| 18 | Thumbnails | [phase-18-thumbnails.md](phase-18-thumbnails.md) | 12 | — |
+| 19 | Account Security | [phase-19-account-security.md](phase-19-account-security.md) | 11 | — |
+| 20 | Storage Quota & Dashboard | [phase-20-quota-dashboard.md](phase-20-quota-dashboard.md) | 13 | — |
+| 21 | Notifications v2 | [phase-21-notifications.md](phase-21-notifications.md) | 14 | — |
+| 22 | Admin User Lifecycle | [phase-22-admin-users.md](phase-22-admin-users.md) | 19 | — |
+| 23 | Checksums & Duplicates | [phase-23-checksums.md](phase-23-checksums.md) | 13 | — |
 
 ## UI Plan
 

@@ -21,17 +21,24 @@ async function main() {
       case "BULK_ARCHIVE": {
         const { fileIds, userId } = job.payload as { fileIds: string[]; userId: string };
 
-        // 1. Resolve permitted files
-        const { getPermittedFiles } = await import("./lib/permissions");
-        const permitted = await getPermittedFiles(userId);
-        const permittedIds = new Set(permitted.map((f) => f.id));
-
-        // 2. Fetch full file metadata
+        // 1. Resolve requested files and which of them the requester may read
+        const { accessibleFilesWhere } = await import("./lib/permissions");
         const { db } = await import("./lib/db");
+        const requester = await db.user.findUnique({
+          where: { id: userId },
+          select: { id: true, role: true },
+        });
         const files = await db.file.findMany({
           where: { id: { in: fileIds } },
           select: { id: true, displayName: true, objectKey: true },
         });
+        const permitted = requester
+          ? await db.file.findMany({
+              where: { AND: [{ id: { in: fileIds } }, accessibleFilesWhere(requester)] },
+              select: { id: true },
+            })
+          : [];
+        const permittedIds = new Set(permitted.map((f) => f.id));
 
         // 3. Build ZIP
         // archiver v8 ships named format classes (ESM); the old

@@ -378,7 +378,7 @@ export function FileDetailClient({
         <div className="flex items-center gap-2 self-start md:self-center">
           {/* Download button - always shown */}
           <Button asChild className="shadow-xs">
-            <a href={`/api/files/${file.id}`} download={file.displayName}>
+            <a href={`/api/files/${file.id}?download=1`} download={file.displayName}>
               <Download className="size-4 mr-2" /> Download
             </a>
           </Button>

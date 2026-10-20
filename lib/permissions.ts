@@ -1,4 +1,4 @@
-import { Role, Visibility, File, FilePermission, User } from "@prisma/client";
+import { Prisma, Role, File, User } from "@prisma/client";
 import { AppError } from "@/lib/result";
 import { redis, redisKey, NS } from "@/lib/redis";
 import { db } from "@/lib/db";
@@ -16,56 +16,70 @@ export function hasMinimumLevel(level: AccessLevel, min: AccessLevel) {
   return RolePriority[level] >= RolePriority[min];
 }
 
-type FileWithVisibility = Pick<File, "visibility" | "guestAccess" | "isMentionRestricted">;
+function maxLevel(a: AccessLevel | null, b: AccessLevel | null): AccessLevel | null {
+  if (!a) return b;
+  if (!b) return a;
+  return RolePriority[a] >= RolePriority[b] ? a : b;
+}
+
+type FileForAccess = Pick<
+  File,
+  "ownerId" | "visibility" | "guestAccess" | "isMentionRestricted"
+>;
 type UserWithRole = Pick<User, "id" | "role">;
-type FilePermissionGrants = Pick<FilePermission, "role" | "userId">[];
-type MentionedUsers = string[]; 
 
 /**
- * Pure function resolving access exactly according to canonical order.
+ * Pure access resolver — the single source of truth for file access rules.
+ * Every read path (detail page, download, list, search, bulk ZIP, share token)
+ * must agree with this function; the SQL/Prisma predicates below mirror it.
+ *
+ * Order:
+ *   1. SUPERADMIN bypass.
+ *   2. Owner → ADMIN.
+ *   3. Unowned file + global ADMIN → ADMIN (orphan management).
+ *   4. Explicit per-file grant, clamped to the user's system role.
+ *   5. Mention-restriction gate (applies only to visibility-derived access).
+ *   6. PUBLIC visibility: global ADMIN → ADMIN (moderation), user → VIEWER,
+ *      anonymous → GUEST when guest access is enabled.
+ * The highest level from steps 4 and 6 wins.
  */
 export function resolveAccess(
   user: UserWithRole | null,
-  file: FileWithVisibility,
+  file: FileForAccess,
   explicitGrantLevel: Role | null,
-  isMentioned: boolean
+  isMentioned: boolean,
 ): AccessLevel | null {
-  // 1. superadmin bypass
   if (user?.role === "SUPERADMIN") return "SUPERADMIN";
+  if (user && file.ownerId === user.id) return "ADMIN";
+  if (user && file.ownerId === null && user.role === "ADMIN") return "ADMIN";
 
-  // 2. File-level explicit grant
+  let grantLevel: AccessLevel | null = null;
   if (user && explicitGrantLevel) {
-     // Downward clamp: a system guest cannot exceed viewer at file level.
-     const clamped = RolePriority[explicitGrantLevel] > RolePriority[user.role] 
-        ? user.role 
+    grantLevel =
+      RolePriority[explicitGrantLevel] > RolePriority[user.role]
+        ? user.role
         : explicitGrantLevel;
-     return clamped;
   }
 
-  // 3. Mention-restriction gate
-  if (file.isMentionRestricted) {
-     if (!user || !isMentioned) return null;
+  let visibilityLevel: AccessLevel | null = null;
+  const passesMentionGate = !file.isMentionRestricted || (!!user && isMentioned);
+  if (file.visibility === "PUBLIC" && passesMentionGate) {
+    if (user) {
+      visibilityLevel = user.role === "ADMIN" ? "ADMIN" : "VIEWER";
+    } else if (file.guestAccess) {
+      visibilityLevel = "GUEST";
+    }
   }
 
-  let baseLevel: AccessLevel | null = null;
-  
-  // 4. File visibility
-  if (file.visibility === "PUBLIC") {
-     if (user) {
-        baseLevel = "VIEWER";
-     } else if (file.guestAccess) {
-        baseLevel = "GUEST";
-     }
-  }
-
-  // 5. Otherwise
-  return baseLevel;
+  return maxLevel(grantLevel, visibilityLevel);
 }
 
 const PERM_TTL_SECONDS = 60 * 5; // 5 minutes cache TTL
 
 /**
- * Resolves and caches the access level for a user-file pair.
+ * Resolves and caches the access level for a user-file pair. Does not check
+ * soft-delete/expiry — callers load the file with the lifecycle filter they
+ * need (e.g. recovery flows legitimately operate on soft-deleted rows).
  */
 export async function getCachedAccess(
   user: UserWithRole | null,
@@ -78,47 +92,33 @@ export async function getCachedAccess(
     return cached as AccessLevel;
   }
 
-  // Resolve from DB
   const file = await db.file.findUnique({
     where: { id: fileId },
-    select: { ownerId: true, visibility: true, guestAccess: true, isMentionRestricted: true }
+    select: { ownerId: true, visibility: true, guestAccess: true, isMentionRestricted: true },
   });
-
   if (!file) throw AppError.notFound("File not found");
-
-  // Owner bypass: owners always have full access to their files
-  if (user && file.ownerId === user.id) {
-    const level = user.role === "SUPERADMIN" ? "SUPERADMIN" : "ADMIN";
-    await redis.set(cacheKey, level, "EX", PERM_TTL_SECONDS);
-    return level;
-  }
 
   let explicitGrantLevel: Role | null = null;
   let isMentioned = false;
 
-  if (user) {
+  if (user && user.role !== "SUPERADMIN" && file.ownerId !== user.id) {
     const perm = await db.filePermission.findUnique({
       where: { fileId_userId: { fileId, userId: user.id } },
-      select: { role: true }
+      select: { role: true },
     });
-    explicitGrantLevel = perm?.role || null;
+    explicitGrantLevel = perm?.role ?? null;
 
     if (file.isMentionRestricted) {
       const mention = await db.fileMention.findUnique({
-        where: { fileId_mentionedUserId: { fileId, mentionedUserId: user.id } }
+        where: { fileId_mentionedUserId: { fileId, mentionedUserId: user.id } },
+        select: { id: true },
       });
       isMentioned = !!mention;
     }
   }
 
-  const level = resolveAccess(user as UserWithRole, file, explicitGrantLevel, isMentioned);
-  
-  if (level) {
-    await redis.set(cacheKey, level, "EX", PERM_TTL_SECONDS);
-  } else {
-    await redis.set(cacheKey, "NONE", "EX", PERM_TTL_SECONDS);
-  }
-
+  const level = resolveAccess(user, file, explicitGrantLevel, isMentioned);
+  await redis.set(cacheKey, level ?? "NONE", "EX", PERM_TTL_SECONDS);
   return level;
 }
 
@@ -128,11 +128,40 @@ export async function getCachedAccess(
 export async function requireAccess(
   user: UserWithRole | null,
   fileId: string,
-  min: AccessLevel
+  min: AccessLevel,
 ): Promise<AccessLevel> {
   const level = await getCachedAccess(user, fileId);
   if (!level || !hasMinimumLevel(level, min)) {
     throw AppError.forbidden();
+  }
+  return level;
+}
+
+/**
+ * Whether a user may contribute collaborative content (notes, tags) to a file.
+ * Plain visibility-derived VIEWER access is NOT enough: only managers (ADMIN+),
+ * users holding an explicit grant, and mentioned users may contribute.
+ */
+export async function requireContributor(
+  user: UserWithRole,
+  fileId: string,
+): Promise<AccessLevel> {
+  const level = await getCachedAccess(user, fileId);
+  if (!level) throw AppError.forbidden();
+  if (hasMinimumLevel(level, "ADMIN")) return level;
+
+  const [grant, mention] = await Promise.all([
+    db.filePermission.findUnique({
+      where: { fileId_userId: { fileId, userId: user.id } },
+      select: { id: true },
+    }),
+    db.fileMention.findUnique({
+      where: { fileId_mentionedUserId: { fileId, mentionedUserId: user.id } },
+      select: { id: true },
+    }),
+  ]);
+  if (!grant && !mention) {
+    throw AppError.forbidden("Only collaborators can contribute to this file");
   }
   return level;
 }
@@ -143,60 +172,73 @@ export async function requireAccess(
  */
 export async function invalidatePermCache(userId: string | null, fileId: string | null) {
   const pattern = redisKey(NS.perm, userId || "*", fileId || "*");
-  
-  const stream = redis.scanStream({
-    match: pattern,
-    count: 100,
-  });
-
-  return new Promise<void>((resolve, reject) => {
-    stream.on("data", async (keys: string[]) => {
-      if (keys.length) {
-        // Pause stream to await pipeline
-        stream.pause();
-        const pipeline = redis.pipeline();
-        keys.forEach(key => pipeline.del(key));
-        await pipeline.exec();
-        stream.resume();
-      }
-    });
-    stream.on("end", () => resolve());
-    stream.on("error", reject);
-  });
+  let cursor = "0";
+  do {
+    const [next, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 200);
+    cursor = next;
+    if (keys.length > 0) await redis.unlink(...keys);
+  } while (cursor !== "0");
 }
 
-/**
- * Get all files a user is permitted to see.
- * This is primarily used to scope search and bulk downloads.
- */
-export async function getPermittedFiles(userId: string): Promise<{ id: string }[]> {
-  const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
-  if (!user) return [];
+type ListUser = { id: string; role: string } | null;
 
-  if (user.role === "SUPERADMIN") {
-    return db.file.findMany({ select: { id: true } });
-  } else if (user.role === "ADMIN") {
-    return db.file.findMany({
-      where: {
-        OR: [
-          { ownerId: user.id },
-          { visibility: "PUBLIC" },
-          { permissions: { some: { userId: user.id } } },
-          { ownerId: null, visibility: "PRIVATE" }
-        ]
-      },
-      select: { id: true }
-    });
-  } else {
-    return db.file.findMany({
-      where: {
-        OR: [
-          { ownerId: user.id },
-          { visibility: "PUBLIC" },
-          { permissions: { some: { userId: user.id } } }
-        ]
-      },
-      select: { id: true }
-    });
+/**
+ * Raw-SQL predicate (table alias `f`) selecting the live files a user can read.
+ * Mirrors `resolveAccess` exactly, plus the soft-delete and expiry filters.
+ */
+export function accessibleFilesSql(user: ListUser): Prisma.Sql {
+  const live = Prisma.sql`f."deletedAt" IS NULL AND (f."expiresAt" IS NULL OR f."expiresAt" > NOW())`;
+
+  if (!user) {
+    return Prisma.sql`${live} AND f.visibility = 'PUBLIC' AND f."guestAccess" = true AND f."isMentionRestricted" = false`;
   }
+  if (user.role === "SUPERADMIN") return live;
+
+  const unowned = user.role === "ADMIN" ? Prisma.sql`OR f."ownerId" IS NULL` : Prisma.empty;
+
+  return Prisma.sql`${live} AND (
+    f."ownerId" = ${user.id}
+    ${unowned}
+    OR EXISTS (SELECT 1 FROM file_permission fp WHERE fp."fileId" = f.id AND fp."userId" = ${user.id})
+    OR (
+      f.visibility = 'PUBLIC'
+      AND (
+        f."isMentionRestricted" = false
+        OR EXISTS (SELECT 1 FROM file_mention fm WHERE fm."fileId" = f.id AND fm."mentionedUserId" = ${user.id})
+      )
+    )
+  )`;
+}
+
+/** Prisma `where` equivalent of `accessibleFilesSql`. */
+export function accessibleFilesWhere(user: ListUser): Prisma.FileWhereInput {
+  const live: Prisma.FileWhereInput = {
+    deletedAt: null,
+    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+  };
+
+  if (!user) {
+    return {
+      AND: [
+        live,
+        { visibility: "PUBLIC", guestAccess: true, isMentionRestricted: false },
+      ],
+    };
+  }
+  if (user.role === "SUPERADMIN") return live;
+
+  const scope: Prisma.FileWhereInput[] = [
+    { ownerId: user.id },
+    { permissions: { some: { userId: user.id } } },
+    {
+      visibility: "PUBLIC",
+      OR: [
+        { isMentionRestricted: false },
+        { mentions: { some: { mentionedUserId: user.id } } },
+      ],
+    },
+  ];
+  if (user.role === "ADMIN") scope.push({ ownerId: null });
+
+  return { AND: [live, { OR: scope }] };
 }

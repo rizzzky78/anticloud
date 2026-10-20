@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { search } from "@/actions/search";
-import { FileMetaRecord } from "@/lib/file-meta";
+import type { SearchResult } from "@/lib/search";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ export function SearchUI() {
   const [query, setQuery] = useState("");
   const [tags, setTags] = useState("");
   const [mimeType, setMimeType] = useState("");
-  const [results, setResults] = useState<FileMetaRecord[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function handleSearch(e: React.FormEvent) {

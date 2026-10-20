@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { redis, redisKey, NS } from "@/lib/redis";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
-import { requireAccess } from "@/lib/permissions";
+import { requireContributor } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 // ─── Tag-frequency sorted-set key ────────────────────────────────────────────
 // One global sorted-set: `tagfreq:` → member = tag value, score = usage count.
@@ -51,7 +52,7 @@ async function bustOwnerSearchCache(fileId: string): Promise<void> {
 /**
  * Add a tag to a file.
  *
- * - Requires at least VIEWER access on the file (permission-gated).
+ * - Requires collaborator access (manager, grantee, or mentioned user).
  * - Rejects if the file is `isReadOnly`.
  * - Upserts the `Tag` row (by unique value) and the `FileTag` junction.
  * - Increments the tag's score in the `tagfreq:` Redis sorted set.
@@ -63,7 +64,7 @@ export async function addTag(payload: z.infer<typeof addTagSchema>) {
   const { fileId, value } = addTagSchema.parse(payload);
 
   // Permission gate: VIEWER or higher.
-  await requireAccess(session.user as any, fileId, "VIEWER");
+  await requireContributor(session.user as any, fileId);
 
   // Reject read-only files.
   const file = await db.file.findUnique({
@@ -96,6 +97,14 @@ export async function addTag(payload: z.infer<typeof addTagSchema>) {
   await updateSearchVector(fileId);
   await bustOwnerSearchCache(fileId);
 
+  await recordAudit({
+    actorId: session.user.id,
+    action: "tag.add",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { tag: value },
+  });
+
   return { success: true };
 }
 
@@ -113,7 +122,7 @@ export async function removeTag(payload: z.infer<typeof removeTagSchema>) {
 
   const { fileId, value } = removeTagSchema.parse(payload);
 
-  await requireAccess(session.user as any, fileId, "VIEWER");
+  await requireContributor(session.user as any, fileId);
 
   const file = await db.file.findUnique({
     where: { id: fileId },
@@ -139,6 +148,14 @@ export async function removeTag(payload: z.infer<typeof removeTagSchema>) {
 
   await updateSearchVector(fileId);
   await bustOwnerSearchCache(fileId);
+
+  await recordAudit({
+    actorId: session.user.id,
+    action: "tag.remove",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { tag: value },
+  });
 
   return { success: true };
 }

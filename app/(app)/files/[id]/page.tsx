@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-context";
 import { getFileMeta } from "@/lib/file-meta";
-import { getCachedAccess } from "@/lib/permissions";
+import { getCachedAccess, hasMinimumLevel } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { listUserFolderPaths } from "@/lib/file-list";
 import { FileDetailClient } from "@/components/file-detail-client";
@@ -65,6 +65,14 @@ export default async function FileDetailPage({ params }: PageProps) {
   if (!level) {
     notFound(); // Prevent existence leaks
   }
+
+  // Never ship storage internals to the browser; the permanent-URL token is a
+  // capability and is only exposed to users who can manage the file.
+  const clientFile = {
+    ...file,
+    objectKey: "",
+    permanentUrlToken: hasMinimumLevel(level, "ADMIN") ? file.permanentUrlToken : null,
+  };
 
   // 3. Fetch related details concurrently
   const [tags, mentions, folderPaths, ownerRecord] = await Promise.all([
@@ -158,7 +166,7 @@ export default async function FileDetailPage({ params }: PageProps) {
 
   return (
     <FileDetailClient
-      file={file}
+      file={clientFile}
       ownerName={ownerName}
       user={user}
       folderPaths={folderPaths}

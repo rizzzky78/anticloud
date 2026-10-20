@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/command";
 import { search } from "@/actions/search";
 import { getFileIcon } from "@/components/file-list-types";
-import { FileMetaRecord } from "@/lib/file-meta";
+import type { SearchResult } from "@/lib/search";
 import { Search, Loader2, ArrowRight } from "lucide-react";
 import { formatBytes } from "@/lib/format";
 
@@ -24,7 +24,7 @@ interface SearchCommandProps {
 export function SearchCommand({ open, onOpenChange }: SearchCommandProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<FileMetaRecord[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   // ⌘K or Ctrl+K keyboard shortcut listener

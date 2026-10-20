@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,14 @@ export async function addMention(payload: z.infer<typeof addMentionSchema>) {
   const fileForOwner = await db.file.findUnique({ where: { id: fileId }, select: { ownerId: true }});
   if (fileForOwner?.ownerId) await invalidateUserSearchCache(fileForOwner.ownerId);
 
+  await recordAudit({
+    actorId: session.user.id,
+    action: "mention.add",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { mentionedUserId },
+  });
+
   return { success: true };
 }
 
@@ -126,6 +135,14 @@ export async function removeMention(payload: z.infer<typeof removeMentionSchema>
   
   const fileForOwner = await db.file.findUnique({ where: { id: fileId }, select: { ownerId: true }});
   if (fileForOwner?.ownerId) await invalidateUserSearchCache(fileForOwner.ownerId);
+
+  await recordAudit({
+    actorId: session.user.id,
+    action: "mention.remove",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { mentionedUserId },
+  });
 
   return { success: true };
 }

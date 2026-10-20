@@ -12,8 +12,10 @@ export async function searchUsers(query: string) {
   const session = await getCurrentUser();
   if (!session) throw AppError.unauthorized();
 
-  const trimmed = query.trim();
-  if (!trimmed) return [];
+  // Intranet directory lookup for sharing/mentions. Require a minimal query so
+  // the endpoint cannot be used to dump the whole user table in one call.
+  const trimmed = query.trim().slice(0, 100);
+  if (trimmed.length < 2) return [];
 
   return db.user.findMany({
     where: {

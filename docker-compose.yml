@@ -6,15 +6,10 @@
 # Services:
 #   - anticloud-production : Next.js 16 web server (Bun runtime, standalone)
 #   - anticloud-worker     : background job consumer (worker.ts)
-#   - anticloud-nginx      : nginx reverse proxy, terminates HTTPS on :3070
 #
 # Topology:
-#                          host:3070 (HTTPS)
+#                          host:3070 (HTTP)
 #                               |
-#                          +----v-----+
-#                          |  nginx   |  (TLS termination, self-signed cert)
-#                          +----+-----+
-#                               | http   (private docker network: anticloud-net)
 #                          +----v-----------------+
 #                          | anticloud-production |  (Next.js on :3000)
 #                          +----+-----------------+
@@ -31,7 +26,6 @@
 #
 # Usage:
 #   cp .env.example .env                         # then edit secrets
-#   bash nginx/generate-cert.sh 10.54.204.59     # create self-signed TLS cert
 #   docker compose --env-file .env up -d --build
 # =============================================================================
 
@@ -53,7 +47,7 @@ services:
 
     environment:
       - NODE_ENV=production
-      # Internal port nginx proxies to. Keep in sync with nginx upstream.
+      # Port the Next.js server listens on inside the container.
       - PORT=3000
       - HOSTNAME=0.0.0.0
       # Apply `prisma migrate deploy` on boot. Set to "false" to skip.
@@ -68,9 +62,9 @@ services:
     networks:
       - anticloud-net
 
-    # Not published to the host — only nginx (same network) can reach it.
-    expose:
-      - "3000"
+    # Served directly over HTTP on the intranet (no reverse proxy).
+    ports:
+      - "${APP_PORT:-3070}:3000"
 
     healthcheck:
       test:
@@ -118,46 +112,8 @@ services:
     networks:
       - anticloud-net
 
-  # ---------------------------------------------------------------------------
-  # nginx — HTTPS reverse proxy (intranet, self-signed certificate)
-  # ---------------------------------------------------------------------------
-  anticloud-nginx:
-    image: nginx:1.30-alpine
-    container_name: anticloud-nginx
-    restart: unless-stopped
-
-    depends_on:
-      anticloud-production:
-        condition: service_started
-
-    ports:
-      - "${HTTPS_PORT:-3070}:443"
-
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-
-    networks:
-      - anticloud-net
-
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-check-certificate",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "https://localhost:443/",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-
 # =============================================================================
-# Private bridge network for app <-> worker <-> nginx traffic only.
+# Private bridge network for app <-> worker traffic.
 # =============================================================================
 networks:
   anticloud-net:

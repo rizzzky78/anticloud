@@ -61,6 +61,15 @@ export async function grantFileRole(payload: z.infer<typeof grantFileRoleSchema>
   // Requires ADMIN access on the file to grant roles
   await requireAccess(session.user as any, fileId, "ADMIN");
 
+  const [target, file] = await Promise.all([
+    db.user.findUnique({ where: { id: targetUserId }, select: { id: true } }),
+    db.file.findUnique({ where: { id: fileId }, select: { ownerId: true } }),
+  ]);
+  if (!target) throw AppError.notFound("User not found");
+  if (file?.ownerId === targetUserId) {
+    throw AppError.badRequest("The owner already has full access");
+  }
+
   await db.filePermission.upsert({
     where: { fileId_userId: { fileId, userId: targetUserId } },
     update: { role, grantedById: session.user.id },
@@ -91,8 +100,8 @@ export async function revokeFileRole(payload: z.infer<typeof revokeFileRoleSchem
 
   await requireAccess(session.user as any, fileId, "ADMIN");
 
-  await db.filePermission.delete({
-    where: { fileId_userId: { fileId, userId: targetUserId } }
+  await db.filePermission.deleteMany({
+    where: { fileId, userId: targetUserId },
   });
 
   await invalidatePermCache(targetUserId, fileId);
@@ -116,8 +125,8 @@ export async function getFilePermissions(payload: z.infer<typeof getFilePermissi
 
   const { fileId } = getFilePermissionsSchema.parse(payload);
 
-  // Requires at least GUEST access on the file to view who has access
-  await requireAccess(session.user as any, fileId, "GUEST");
+  // Requires at least VIEWER access on the file to view who has access
+  await requireAccess(session.user as any, fileId, "VIEWER");
 
   return db.filePermission.findMany({
     where: { fileId },

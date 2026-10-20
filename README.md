@@ -366,7 +366,7 @@ MINIO_REGION=auto
 ## 🐳 Deployment
 
 Anticloud ships with a production Docker setup that runs the app + worker and can
-**optionally** run local Postgres, Redis, MinIO, and nginx (HTTPS) as containers —
+**optionally** run local Postgres, Redis, and MinIO as containers —
 each toggled by a Compose profile. Use it for an all-in-one box, or point any
 service at a managed provider.
 
@@ -378,9 +378,8 @@ docker compose run --rm app bunx prisma migrate deploy
 docker compose up -d
 ```
 
-**Full guide — including HTTPS via nginx (Let's Encrypt or self-signed), the
-cloud-vs-local matrix, TLS for presigned download URLs, and the TTL cron — lives
-in [`deploy/README.md`](deploy/README.md).**
+**Full guide — the app is served directly over HTTP on the intranet — lives in
+[`SETUP.md`](SETUP.md).**
 
 ---
 
@@ -396,7 +395,6 @@ components/          UI components (shadcn/ui based)
 lib/                 infrastructure: env, db, redis, storage, auth, permissions
 prisma/              schema + migrations
 scripts/             setup-fts, create-superadmin
-deploy/              Dockerfile assets, nginx configs, deployment guide
 worker.ts            background job consumer (bulk archive, compression, expiry)
 instrumentation.ts   boot hook — ensures the storage bucket exists
 ```

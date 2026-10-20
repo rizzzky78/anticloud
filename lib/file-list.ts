@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { accessibleFilesSql } from "@/lib/permissions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,9 +99,6 @@ const BUCKET_EXPR = Prisma.sql`
   END
 `;
 
-/** Filters out files that have passed their TTL. Phase-09 cron does the actual cleanup. */
-const EXPIRY_FILTER = Prisma.sql`AND (f."expiresAt" IS NULL OR f."expiresAt" > NOW())`;
-
 const SELECT_COLS = Prisma.sql`
   f.id,
   f."ownerId"             AS owner_id,
@@ -174,72 +172,10 @@ export async function listFilesGrouped(
     : Prisma.sql``;
 
   // ── Unauthenticated: public + guest-enabled only ──────────────────────────
-  if (!user) {
-    const rows = await db.$queryRaw<RawFileRow[]>`
-      SELECT ${SELECT_COLS}
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-        AND f.visibility = 'PUBLIC'
-        AND f."guestAccess" = true
-        ${folderFilter}
-      ORDER BY f."createdAt" DESC
-      LIMIT ${pageSize} OFFSET ${offset}
-    `;
-    return groupRows(rows);
-  }
-
-  // ── SUPERADMIN: all non-deleted files ─────────────────────────────────────
-  if (user.role === "SUPERADMIN") {
-    const rows = await db.$queryRaw<RawFileRow[]>`
-      SELECT ${SELECT_COLS}
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-        ${folderFilter}
-      ORDER BY f."createdAt" DESC
-      LIMIT ${pageSize} OFFSET ${offset}
-    `;
-    return groupRows(rows);
-  }
-
-  // ── ADMIN: own + public + grants + unowned-private ────────────────────────
-  if (user.role === "ADMIN") {
-    const rows = await db.$queryRaw<RawFileRow[]>`
-      SELECT ${SELECT_COLS}
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-        AND (
-          f."ownerId" = ${user.id}
-          OR f.visibility = 'PUBLIC'
-          OR EXISTS (
-            SELECT 1 FROM file_permission fp
-            WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
-          )
-          OR (f."ownerId" IS NULL AND f.visibility = 'PRIVATE')
-        )
-        ${folderFilter}
-      ORDER BY f."createdAt" DESC
-      LIMIT ${pageSize} OFFSET ${offset}
-    `;
-    return groupRows(rows);
-  }
-
-  // ── Regular user (VIEWER / GUEST): own + public + grants ─────────────────
   const rows = await db.$queryRaw<RawFileRow[]>`
     SELECT ${SELECT_COLS}
     FROM "file" f
-    WHERE f."deletedAt" IS NULL
-      ${EXPIRY_FILTER}
-      AND (
-        f."ownerId" = ${user.id}
-        OR f.visibility = 'PUBLIC'
-        OR EXISTS (
-          SELECT 1 FROM file_permission fp
-          WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
-        )
-      )
+    WHERE ${accessibleFilesSql(user)}
       ${folderFilter}
     ORDER BY f."createdAt" DESC
     LIMIT ${pageSize} OFFSET ${offset}
@@ -322,60 +258,10 @@ export function getImmediateSubfolders(currentPath: string, allPaths: string[]):
 export async function listUserFolderPaths(
   user: { id: string; role: string } | null,
 ): Promise<string[]> {
-  if (!user) {
-    const rows = await db.$queryRaw<{ folder_path: string }[]>`
-      SELECT DISTINCT f."folderPath" AS folder_path
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-        AND f.visibility = 'PUBLIC'
-        AND f."guestAccess" = true
-    `;
-    return rows.map((r) => r.folder_path);
-  }
-
-  if (user.role === "SUPERADMIN") {
-    const rows = await db.$queryRaw<{ folder_path: string }[]>`
-      SELECT DISTINCT f."folderPath" AS folder_path
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-    `;
-    return rows.map((r) => r.folder_path);
-  }
-
-  if (user.role === "ADMIN") {
-    const rows = await db.$queryRaw<{ folder_path: string }[]>`
-      SELECT DISTINCT f."folderPath" AS folder_path
-      FROM "file" f
-      WHERE f."deletedAt" IS NULL
-        ${EXPIRY_FILTER}
-        AND (
-          f."ownerId" = ${user.id}
-          OR f.visibility = 'PUBLIC'
-          OR EXISTS (
-            SELECT 1 FROM file_permission fp
-            WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
-          )
-          OR (f."ownerId" IS NULL AND f.visibility = 'PRIVATE')
-        )
-    `;
-    return rows.map((r) => r.folder_path);
-  }
-
   const rows = await db.$queryRaw<{ folder_path: string }[]>`
     SELECT DISTINCT f."folderPath" AS folder_path
     FROM "file" f
-    WHERE f."deletedAt" IS NULL
-      ${EXPIRY_FILTER}
-      AND (
-        f."ownerId" = ${user.id}
-        OR f.visibility = 'PUBLIC'
-        OR EXISTS (
-          SELECT 1 FROM file_permission fp
-          WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
-        )
-      )
+    WHERE ${accessibleFilesSql(user)}
   `;
   return rows.map((r) => r.folder_path);
 }

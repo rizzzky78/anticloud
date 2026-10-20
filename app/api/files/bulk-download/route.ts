@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { db } from "@/lib/db";
-import { getPermittedFiles } from "@/lib/permissions";
+import { accessibleFilesWhere } from "@/lib/permissions";
 import { getObjectStream } from "@/lib/storage";
 import { Readable } from "node:stream";
 import { ZipArchive } from "archiver";
@@ -14,7 +14,7 @@ import { enqueueJob } from "@/lib/jobs";
 export const runtime = "nodejs";
 
 const bulkDownloadSchema = z.object({
-  fileIds: z.array(z.string().min(1)),
+  fileIds: z.array(z.string().min(1)).max(1000),
 });
 
 // Max files for sync stream; above this we trigger an async job
@@ -55,15 +55,21 @@ export async function POST(req: Request) {
     }
 
     // Phase 09 §9.3: Sync stream bulk download
-    // 1. Resolve permitted files
-    const permitted = await getPermittedFiles(session.user.id);
+    // 1. Resolve requested files, and which of them the caller may read
+    //    (central predicate: excludes soft-deleted, expired, and
+    //    mention-restricted files the caller is not mentioned on).
+    const user = { id: session.user.id, role: session.user.role as string };
+    const [files, permitted] = await Promise.all([
+      db.file.findMany({
+        where: { id: { in: fileIds } },
+        select: { id: true, displayName: true, objectKey: true },
+      }),
+      db.file.findMany({
+        where: { AND: [{ id: { in: fileIds } }, accessibleFilesWhere(user)] },
+        select: { id: true },
+      }),
+    ]);
     const permittedIds = new Set(permitted.map((f) => f.id));
-
-    // 2. Fetch full file metadata
-    const files = await db.file.findMany({
-      where: { id: { in: fileIds } },
-      select: { id: true, displayName: true, objectKey: true },
-    });
 
     // We will build a stream of a ZIP file directly back to the client.
     // archiver v8 exposes named format classes (ESM); the old

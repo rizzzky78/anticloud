@@ -1,21 +1,17 @@
 # anticloud — Self-Hosted Deployment (Docker)
 
-Step-by-step guide to run **anticloud** on a Linux server (Ubuntu Server) behind
-nginx over HTTPS on the intranet.
+Step-by-step guide to run **anticloud** on a Linux server (Ubuntu Server),
+served directly over plain HTTP on the intranet.
 
-Target deployment: **https://10.54.204.59:3070**
+Target deployment: **http://10.54.204.59:3070**
 
 ---
 
 ## 1. Architecture
 
 ```
-                         host:3070 (HTTPS)
+                         host:3070 (HTTP)
                               │
-                         ┌────▼─────┐
-                         │  nginx   │   TLS termination (self-signed cert)
-                         └────┬─────┘
-                              │ http     private docker network: anticloud-net
                          ┌────▼─────────────────┐
                          │ anticloud-production │   Next.js web server :3000
                          └────┬─────────────────┘
@@ -26,13 +22,12 @@ Target deployment: **https://10.54.204.59:3070**
  (existing containers already running on this host)
 ```
 
-Three containers are created by this compose project:
+Two containers are created by this compose project:
 
 | Container               | Role                                                   | Ports            |
 | ----------------------- | ------------------------------------------------------ | ---------------- |
-| `anticloud-nginx`       | HTTPS reverse proxy, terminates TLS                    | `3070` → host    |
-| `anticloud-production`  | Next.js 16 web server (standalone), runs DB migrations | internal `3000`  |
-| `anticloud-worker`      | Background worker — compression & bulk-archive jobs    | none             |
+| `anticloud-production`  | Next.js 16 web server (standalone), runs DB migrations | `3070` → `3000`  |
+| `anticloud-worker`      | Background worker — jobs and scheduled maintenance     | none             |
 
 PostgreSQL, DragonflyDB, and MinIO are **not** managed here — they are expected
 to already be running on the host with their default ports published.
@@ -68,35 +63,20 @@ Edit `.env` and set real values. At minimum:
 - `DATABASE_URL` — Postgres user/password/db
 - `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET`
 - `APP_URL` and `BETTER_AUTH_URL` — must match the URL the browser uses,
-  including scheme + port (`https://10.54.204.59:3070`).
-- `HTTPS_PORT` — host port nginx publishes (default `3070`).
+  including scheme + port (`http://10.54.204.59:3070`).
+- `APP_PORT` — host port the app publishes (default `3070`).
 
 The full contract and inline notes live in [`.env.example`](.env.example).
 
 ---
 
-## 4. Generate the TLS certificate
-
-A self-signed certificate is used for the intranet. Pass the server IP (and any
-DNS names) so the cert includes them as SANs:
-
-```bash
-bash nginx/generate-cert.sh 10.54.204.59
-```
-
-This writes `nginx/certs/anticloud.crt` and `nginx/certs/anticloud.key`, which
-nginx mounts read-only. Browsers will show a one-time trust warning (expected for
-self-signed certs — accept the exception, or distribute the cert to clients).
-
----
-
-## 5. Build and start
+## 4. Build and start
 
 ```bash
 docker compose --env-file .env up -d --build
 ```
 
-This builds both images (web + worker) and starts all three containers.
+This builds both images (web + worker) and starts both containers.
 On first boot the web container applies database migrations
 (`prisma migrate deploy`, controlled by `RUN_MIGRATIONS=true`).
 
@@ -108,11 +88,11 @@ docker compose logs -f anticloud-production
 docker compose logs -f anticloud-worker
 ```
 
-All three containers should report `healthy` / `running`.
+Both containers should report `healthy` / `running`.
 
 ---
 
-## 6. Create the first superadmin
+## 5. Create the first superadmin
 
 After the stack is up and migrations have applied, create an initial admin
 account by running the provisioning script in a one-off worker container:
@@ -129,16 +109,15 @@ docker compose run --rm anticloud-worker bun run scripts/setup-fts.ts
 
 ---
 
-## 7. Verify
+## 6. Verify
 
-Open **https://10.54.204.59:3070** in a browser (accept the self-signed
-certificate), sign in with the superadmin account, and confirm uploads work
+Open **http://10.54.204.59:3070** in a browser, sign in with the superadmin account, and confirm uploads work
 (this exercises MinIO) and that a compression/bulk-download job completes (this
 exercises the worker + Redis).
 
 ---
 
-## 8. Operations
+## 7. Operations
 
 **Update to a new build:**
 
@@ -161,15 +140,9 @@ docker compose down            # stop & remove containers (data lives in the
 docker compose run --rm anticloud-production bunx prisma migrate deploy
 ```
 
-**Rotate the certificate** — re-run step 4, then:
-
-```bash
-docker compose restart anticloud-nginx
-```
-
 ---
 
-## 9. Troubleshooting
+## 8. Troubleshooting
 
 | Symptom                                   | Likely cause / fix                                                                 |
 | ----------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -177,5 +150,4 @@ docker compose restart anticloud-nginx
 | `ECONNREFUSED` to Postgres/Redis/MinIO    | Backing service not listening on the host gateway. Bind it to `0.0.0.0`, not `127.0.0.1`. |
 | Uploads return 500 (`NoSuchBucket`)       | MinIO credentials can't create/access `MINIO_BUCKET`; check keys & bucket policy.   |
 | Jobs stay `PENDING` forever               | `anticloud-worker` is down or can't reach Redis — check `docker compose logs anticloud-worker`. |
-| Browser cert warning                      | Expected for self-signed certs; accept the exception or distribute the cert.         |
 | Login redirect loop / wrong URLs          | `APP_URL` / `BETTER_AUTH_URL` don't match the browser URL (scheme + port).           |

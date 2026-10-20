@@ -4,19 +4,21 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
 import { getObjectStream, getPartialObjectStream } from "@/lib/storage";
 import { toApiError, statusFor } from "@/lib/result";
+import { getCachedAccess } from "@/lib/permissions";
+import { safeContentHeaders } from "@/lib/content-headers";
+import type { Role } from "@prisma/client";
 
 export const runtime = "nodejs";
 
-type Session = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
-
-/** Inline permission check — replaced by phase-02 middleware once that ships. */
+/**
+ * Load a live (not soft-deleted, not expired) file and resolve read access via
+ * the central permission resolver, so downloads honor exactly the same rules
+ * as the detail page, listings and search (incl. mention restriction).
+ */
 async function resolveReadAccess(
-  session: Session | null,
+  user: { id: string; role: Role } | null,
   fileId: string,
-): Promise<{
-  file: Awaited<ReturnType<typeof db.file.findFirst>>;
-  allowed: boolean;
-}> {
+) {
   const file = await db.file.findFirst({
     where: {
       id: fileId,
@@ -24,32 +26,10 @@ async function resolveReadAccess(
       OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
     },
   });
-
   if (!file) return { file: null, allowed: false };
 
-  if (!session) {
-    return { file, allowed: file.visibility === "PUBLIC" && file.guestAccess };
-  }
-
-  const role = session.user.role as string | undefined;
-
-  if (role === "SUPERADMIN") return { file, allowed: true };
-  if (file.ownerId === session.user.id) return { file, allowed: true };
-
-  const grant = await db.filePermission.findUnique({
-    where: { fileId_userId: { fileId, userId: session.user.id } },
-    select: { role: true },
-  });
-  if (grant) return { file, allowed: true };
-
-  if (file.visibility === "PUBLIC") return { file, allowed: true };
-
-  // Unowned private files: ADMINs can access (phase-04 §4.5).
-  if (file.ownerId === null && file.visibility === "PRIVATE") {
-    return { file, allowed: role === "ADMIN" };
-  }
-
-  return { file, allowed: false };
+  const level = await getCachedAccess(user, fileId);
+  return { file, allowed: level !== null };
 }
 
 /**
@@ -108,7 +88,10 @@ export async function GET(
     // null rather than throwing when no session is present.
     const session = await getCurrentUser().catch(() => null);
 
-    const { file, allowed } = await resolveReadAccess(session, id);
+    const user = session
+      ? { id: session.user.id, role: session.user.role as Role }
+      : null;
+    const { file, allowed } = await resolveReadAccess(user, id);
 
     if (!file || !allowed) {
       return new Response(null, { status: 404 });
@@ -136,9 +119,10 @@ export async function GET(
       });
     }
 
+    const forceDownload = request.nextUrl.searchParams.get("download") === "1";
+
     const commonHeaders: Record<string, string> = {
-      "Content-Type": file.mimeType,
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.displayName)}`,
+      ...safeContentHeaders(file.mimeType, file.displayName, { forceDownload }),
       "Cache-Control": isPreview
         ? "private, max-age=300, stale-while-revalidate=600"
         : "private, no-cache",

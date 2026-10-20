@@ -59,6 +59,9 @@ export const auth = betterAuth({
         type: "string",
         required: false,
         defaultValue: "VIEWER",
+        // Never accept `role` from the client (sign-up / update-user bodies).
+        // Roles change only through the admin-only `setSystemRole` action.
+        input: false,
       }
     }
   },

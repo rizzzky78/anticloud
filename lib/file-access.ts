@@ -1,6 +1,7 @@
-import { type File } from "@prisma/client";
+import { type File, type Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { AppError } from "@/lib/result";
+import { requireAccess } from "@/lib/permissions";
 
 /** Minimal user shape required for access checks. */
 export interface AccessUser {
@@ -9,11 +10,15 @@ export interface AccessUser {
 }
 
 /**
- * Load a file and verify the caller has write-level access:
- *   ADMIN or SUPERADMIN (global role) → always allowed.
- *   Owner/uploader                    → allowed.
- *   Explicit ADMIN or SUPERADMIN file-permission grant → allowed.
- *   Otherwise  → 403.
+ * Load a file and verify the caller has manage-level (ADMIN) access, as
+ * resolved by the central permission resolver (`lib/permissions.ts`):
+ *   SUPERADMIN                         → always allowed.
+ *   Owner                              → allowed.
+ *   Global ADMIN on public/unowned files (subject to mention restriction).
+ *   Explicit ADMIN grant (clamped to the caller's system role).
+ *   Otherwise                          → 403.
+ *
+ * Global ADMINs cannot manage other users' private files they cannot read.
  *
  * @param allowSoftDeleted - set true when the caller legitimately needs to
  *   operate on a soft-deleted file (e.g. recovery). Default false.
@@ -28,18 +33,12 @@ export async function assertWriteAccess(
   });
   if (!file) throw AppError.notFound("File not found");
 
-  const role = user.role ?? "";
-  // Admin-or-above can manage any file; owner can manage their own.
-  if (role === "SUPERADMIN" || role === "ADMIN") return file;
-  if (file.ownerId === user.id) return file;
-
-  const grant = await db.filePermission.findUnique({
-    where: { fileId_userId: { fileId, userId: user.id } },
-    select: { role: true },
-  });
-  if (grant?.role === "ADMIN" || grant?.role === "SUPERADMIN") return file;
-
-  throw AppError.forbidden();
+  await requireAccess(
+    { id: user.id, role: (user.role ?? "GUEST") as Role },
+    fileId,
+    "ADMIN",
+  );
+  return file;
 }
 
 /**

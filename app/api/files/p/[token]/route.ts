@@ -3,6 +3,7 @@ import { type NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getObjectStream } from "@/lib/storage";
 import { toApiError, statusFor } from "@/lib/result";
+import { safeContentHeaders } from "@/lib/content-headers";
 
 export const runtime = "nodejs";
 
@@ -18,9 +19,10 @@ export const runtime = "nodejs";
  *   • File is soft-deleted.
  *   • File has expired (`expiresAt` is in the past).
  *   • File visibility is PRIVATE (changing visibility invalidates the URL).
+ *   • File is mention-restricted (only mentioned users may access it).
  */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
   try {
@@ -38,7 +40,9 @@ export async function GET(
 
     // Permanent URLs are public-only. Revoking public access makes the URL stop
     // serving even if the token itself has not changed.
-    if (file.visibility !== "PUBLIC") return new Response(null, { status: 404 });
+    if (file.visibility !== "PUBLIC" || file.isMentionRestricted) {
+      return new Response(null, { status: 404 });
+    }
 
     const { recordAudit } = await import("@/lib/audit");
     await recordAudit({
@@ -55,9 +59,10 @@ export async function GET(
     return new Response(webStream, {
       status: 200,
       headers: {
-        "Content-Type": file.mimeType,
+        ...safeContentHeaders(file.mimeType, file.displayName, {
+          forceDownload: request.nextUrl.searchParams.get("download") === "1",
+        }),
         "Content-Length": file.size.toString(),
-        "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(file.displayName)}`,
         // Safe to cache briefly — CDN/proxy revalidation is fine for public content.
         "Cache-Control": "public, max-age=300, stale-while-revalidate=60",
       },

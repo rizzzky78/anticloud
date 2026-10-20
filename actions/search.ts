@@ -24,6 +24,10 @@ export async function search(payload: unknown) {
 
   const { query, filters } = searchSchema.parse(payload);
   
-  const results = await searchFiles(session.user.id, query, filters as SearchFilters);
+  const results = await searchFiles(
+    { id: session.user.id, role: session.user.role as string },
+    query,
+    filters as SearchFilters,
+  );
   return { results };
 }

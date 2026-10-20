@@ -68,7 +68,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
   // 2. Fetch search results, folder paths and uploader name (if uploaderId set)
   const [results, folderPaths, uploaderUser] = await Promise.all([
-    searchFiles(user.id, q, filters),
+    searchFiles(user, q, filters),
     listUserFolderPaths(user),
     uploaderId
       ? db.user.findUnique({

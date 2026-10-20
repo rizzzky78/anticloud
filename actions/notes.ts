@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { redis, redisKey } from "@/lib/redis";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
-import { getCachedAccess, requireAccess } from "@/lib/permissions";
+import { getCachedAccess, requireAccess, requireContributor } from "@/lib/permissions";
+import { recordAudit } from "@/lib/audit";
 
 // ─── Redis key ────────────────────────────────────────────────────────────────
 // `note:<fileId>` → JSON-serialised current note (body + version + authorId).
@@ -130,7 +131,8 @@ export async function saveNote(
   const { fileId, body } = saveNoteSchema.parse(payload);
 
   // Permission gate.
-  await requireAccess(session.user as any, fileId, "VIEWER");
+  // Only collaborators (managers, grantees, mentioned users) may edit notes.
+  await requireContributor(session.user as any, fileId);
 
   // Read-only guard.
   const file = await db.file.findUnique({
@@ -187,6 +189,14 @@ export async function saveNote(
   
   const fileForOwner = await db.file.findUnique({ where: { id: fileId }, select: { ownerId: true }});
   if (fileForOwner?.ownerId) await invalidateUserSearchCache(fileForOwner.ownerId);
+
+  await recordAudit({
+    actorId: session.user.id,
+    action: "note.save",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { version: snapshot.version },
+  });
 
   return snapshot;
 }

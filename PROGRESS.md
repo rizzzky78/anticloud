@@ -35,6 +35,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P10 — Audit & observability
 - [x] 10.1 audit model · 10.2 backfill · 10.3 query · 10.4 metrics · 10.5 counters
 
+## P11 — Security hardening
+- [x] 11.1 role input · 11.2 single resolver · 11.3 safe content · 11.4 data minimization · 11.5 collab gates · 11.6 HTTP deploy
+
 ---
 
 # UI Progress

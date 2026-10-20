@@ -127,7 +127,7 @@ export function FileRow({
     <>
       <DropdownMenuItem asChild>
         <a
-          href={`/api/files/${file.id}`}
+          href={`/api/files/${file.id}?download=1`}
           download={file.displayName}
           className="flex items-center w-full"
         >
