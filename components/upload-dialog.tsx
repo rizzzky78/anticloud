@@ -245,6 +245,20 @@ export function UploadDialog({
             idx === index ? { ...q, status: "success", progress: 100 } : q,
           ),
         );
+        // The server reports identical files the user can already see.
+        try {
+          const res = JSON.parse(xhr.responseText) as {
+            duplicates?: { displayName: string; folderPath: string }[];
+          };
+          const dup = res.duplicates?.[0];
+          if (dup) {
+            toast.info(
+              `"${item.file.name}" is identical to "${dup.displayName}" in ${dup.folderPath}.`,
+            );
+          }
+        } catch {
+          // Response without a body is fine.
+        }
         uploadSequentially(index + 1);
       } else {
         let errorMsg = "Upload failed";

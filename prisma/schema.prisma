@@ -216,6 +216,10 @@ model File {
   // the worker for raster images. Null until generated or for other types.
   thumbnailKey String? @unique
 
+  // SHA-256 (hex) of the current content, computed while streaming the upload
+  // (plan/phase-23). Used for integrity display and duplicate detection.
+  sha256 String?
+
   // Visibility / access configuration.
   visibility          Visibility @default(PRIVATE)
   guestAccess         Boolean    @default(false)
@@ -262,6 +266,7 @@ model File {
   @@index([visibility])
   @@index([derivedFromId])
   @@index([searchVector], type: Gin)
+  @@index([sha256])
   @@map("file")
 }
 
@@ -280,6 +285,7 @@ model FileVersion {
   objectKey String @unique
   mimeType  String
   size      BigInt
+  sha256    String?
 
   // Who uploaded this content and when it was originally uploaded.
   uploadedById String?

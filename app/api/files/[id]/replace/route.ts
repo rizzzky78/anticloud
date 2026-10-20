@@ -9,6 +9,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { mimeTypeSchema } from "@/lib/paths";
 import { replaceFileContent } from "@/lib/versions";
 import { assertWithinQuota } from "@/lib/quota";
+import { hashStream } from "@/lib/checksum";
 import { toApiError, statusFor } from "@/lib/result";
 
 export const runtime = "nodejs";
@@ -106,7 +107,16 @@ export async function PUT(
     const nodeStream = Readable.fromWeb(
       body as Parameters<typeof Readable.fromWeb>[0],
     );
-    await putObject(newKey, nodeStream, size, { "Content-Type": newMimeType });
+    const hashing = hashStream(nodeStream);
+    await putObject(newKey, hashing.stream, size, { "Content-Type": newMimeType });
+    if (hashing.bytes() !== size) {
+      await removeObject(newKey).catch(() => {});
+      return Response.json(
+        { code: "BAD_REQUEST", message: "Upload was incomplete. Please try again." },
+        { status: 400 },
+      );
+    }
+    const sha256 = hashing.digest();
 
     let version: number;
     try {
@@ -115,6 +125,7 @@ export async function PUT(
         newObjectKey: newKey,
         mimeType: newMimeType,
         size: BigInt(size),
+        sha256,
         actorId: session.user.id,
       }));
     } catch (err) {

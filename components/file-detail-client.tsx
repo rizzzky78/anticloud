@@ -75,6 +75,7 @@ import { NoteHistoryDialog } from "@/components/note-history";
 import { FileSharingPanel } from "@/components/file-sharing-panel";
 import { FileVersionsPanel } from "@/components/file-versions-panel";
 import { StarButton } from "@/components/star-button";
+import { FileIntegrity } from "@/components/file-integrity";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
 import { compress, promoteDerivative } from "@/actions/compress";
 import { useJobs } from "@/components/jobs-context";
@@ -662,6 +663,10 @@ export function FileDetailClient({
                         </p>
                       </div>
                     </div>
+                  )}
+
+                  {!isSoftDeleted && (
+                    <FileIntegrity fileId={file.id} version={file.version ?? 1} />
                   )}
 
                   {derivatives.length > 0 && (

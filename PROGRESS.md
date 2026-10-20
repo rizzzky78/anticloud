@@ -71,6 +71,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P22 — Admin user lifecycle
 - [x] 22.1 disabled accounts · 22.2 session cache · 22.3 lifecycle actions · 22.4 UI
 
+## P23 — Checksums & duplicates
+- [x] 23.1 schema · 23.2 streaming hash · 23.3 duplicate detection · 23.4 docs
+
 ---
 
 # UI Progress

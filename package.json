@@ -9,7 +9,8 @@
     "lint": "eslint",
     "setup:fts": "bun run scripts/setup-fts.ts",
     "create:superadmin": "bun run scripts/create-superadmin.ts",
-    "backfill:thumbnails": "bun run scripts/backfill-thumbnails.ts"
+    "backfill:thumbnails": "bun run scripts/backfill-thumbnails.ts",
+    "backfill:checksums": "bun run scripts/backfill-checksums.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",

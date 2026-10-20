@@ -4,6 +4,7 @@ import { HardDriveIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
 import { getQuotaStatus, usageByCategory, usageByOwner, type CategoryUsage } from "@/lib/quota";
+import { listOwnDuplicateGroups } from "@/lib/duplicates";
 import { formatBytes } from "@/lib/format";
 import { getFileIcon } from "@/components/file-list-types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +47,7 @@ export default async function StoragePage() {
   const role = session.user.role as string;
   const isAdmin = role === "ADMIN" || role === "SUPERADMIN";
 
-  const [status, categories, largest] = await Promise.all([
+  const [status, categories, largest, duplicateGroups] = await Promise.all([
     getQuotaStatus(userId),
     usageByCategory(userId),
     db.file.findMany({
@@ -55,7 +56,9 @@ export default async function StoragePage() {
       take: 10,
       select: { id: true, displayName: true, mimeType: true, size: true, folderPath: true },
     }),
+    listOwnDuplicateGroups(userId),
   ]);
+  const reclaimable = duplicateGroups.reduce((acc, g) => acc + BigInt(g.wasted), BigInt(0));
 
   const admin = isAdmin
     ? await (async () => {
@@ -177,6 +180,41 @@ export default async function StoragePage() {
             </ul>
           )}
         </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Duplicate files</CardTitle>
+          <CardDescription>
+            {duplicateGroups.length === 0
+              ? "No identical copies among your files."
+              : `Identical copies you own — about ${formatBytes(reclaimable.toString())} could be freed by keeping one of each.`}
+          </CardDescription>
+        </CardHeader>
+        {duplicateGroups.length > 0 && (
+          <CardContent>
+            <ul className="space-y-4">
+              {duplicateGroups.map((g) => (
+                <li key={g.sha256} className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground">
+                    {g.files.length} copies · {formatBytes(g.size)} each ·{" "}
+                    <span className="font-mono">{g.sha256.slice(0, 12)}…</span>
+                  </p>
+                  <ul className="divide-y rounded-lg border">
+                    {g.files.map((f) => (
+                      <li key={f.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <Link href={`/files/${f.id}`} className="truncate text-sm font-medium hover:underline">
+                          {f.displayName}
+                        </Link>
+                        <span className="truncate text-xs text-muted-foreground font-mono">{f.folderPath}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        )}
       </Card>
 
       {admin && (

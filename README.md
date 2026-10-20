@@ -83,22 +83,43 @@ A few design rules fall out of this:
 - **Bulk download** — select many files and get a single ZIP. Each file's access
   is re-validated individually; excluded files are listed (with the reason) in a
   `manifest.txt` inside the archive. Large selections run as a background job and
-  finish with a short-lived presigned link.
+  finish with an authenticated download served by the app.
+- **Version history** — replacing a file never overwrites it: every previous
+  version is kept (configurable limit) and can be downloaded or restored.
+- **Folders as real objects** — create empty folders, rename, move or delete a
+  whole folder tree, and upload entire folders from the browser.
+- **Thumbnails** — the worker renders small WebP previews for images, so lists
+  never download full-size originals.
+- **Checksums & duplicates** — SHA-256 computed while streaming each upload;
+  identical files are flagged on upload, on the file page, and on the Storage page.
+- **Storage quotas** — per-user limits (with a deployment default) counting files,
+  recycle bin and version history; a Storage page shows where space goes.
 - **On-demand compression** — compress a file server-side into a **derived
   version** linked to the original. Non-destructive by default; you choose which
   copy is canonical.
-- **Soft delete & recycle bin** — deletions enter a grace window before a TTL job
-  hard-deletes them; superadmins can restore within the window.
-- **File expiry (TTL)** — set an expiry timestamp; an automated cron job reclaims
-  storage and the database row.
+- **Soft delete & recycle bin** — deletions stay restorable for 30 days, then the
+  worker's maintenance pass purges them; files can also be deleted permanently.
+- **File expiry (TTL)** — set an expiry timestamp; the worker moves expired files
+  to the recycle bin automatically.
+- **Starred, Recent & sorting** — star favourites, jump back to recent work, and
+  sort any folder by date, name or size.
 - **Folders & display names** fully decoupled from physical storage keys.
 
 ### Access control & sharing
 
-- **Two-level RBAC** — system roles (`SUPERADMIN`, `ADMIN`, `VIEWER`, `GUEST`)
-  plus per-file grants. A file owner can grant a specific user a specific role on
-  a specific file; file-level permissions override system-level _downward_, never
-  upward.
+- **Share with people** — give a colleague **Viewer**, **Editor** (can upload new
+  versions, edit notes and tags) or **Manager** access to a file, optionally until
+  a date. Recipients are notified and find it under **Shared**.
+- **Groups** — teams and departments managed by admins and group managers; share
+  a file or folder with a whole group in one step.
+- **Shared folders** — share a folder and everything in it (including files added
+  later) with people or groups; the folder owner manages its contents.
+- **Public share links** — anyone-with-the-link downloads with optional expiry,
+  password and download limit, each revocable and counted.
+- **One permission resolver** — system roles (`SUPERADMIN`, `ADMIN`, `VIEWER`,
+  `GUEST`), direct/group/folder grants, visibility and mention restrictions are
+  resolved in one place and enforced identically by listings, search, downloads
+  and ZIP exports.
 - **Visibility modes** — `PUBLIC` / `PRIVATE`, optional **guest access**,
   **read-only** locks (mutations rejected until lifted), and
   **mention-restricted** files (only mentioned users may access, regardless of
@@ -106,14 +127,17 @@ A few design rules fall out of this:
 - **Unowned & orphaned files** — files can exist without an owner; when an owner
   account is deleted its files become _unowned_ (preserved per their visibility)
   rather than cascade-deleted.
-- **Tokenized share links** — permanent, revocable URLs validated against the
-  file's _current_ permission state on every request (a token, not a capability).
+- **Safe content serving** — uploads are served with `nosniff`, sandboxing CSP and
+  forced download for active content, so an uploaded HTML/SVG file can never run
+  script on the app origin.
 
 ### Collaboration
 
 - **Tags** with Redis-backed frequency autocomplete.
 - **@mentions** that notify users in-app — and double as the access grant for
   mention-restricted files.
+- **Real-time notifications** — shares, mentions, new versions, note edits and
+  finished jobs arrive instantly over Server-Sent Events.
 - **Versioned notes** — every edit is a new revision with authorship recorded;
   prior versions remain visible to the owner and admins.
 
@@ -128,13 +152,15 @@ A few design rules fall out of this:
 
 ### Operations & observability
 
-- **Redis-backed job queue** with a dedicated worker for bulk archiving,
-  compression, and TTL expiry. Failed jobs retry with backoff and land in a
-  **dead-letter queue** flagged for superadmin review.
+- **Crash-safe job queue** with a dedicated worker for bulk archiving,
+  compression, thumbnails and scheduled maintenance. Jobs are claimed atomically,
+  recovered after a worker crash, retried with exponential backoff, and land in a
+  **dead-letter queue** that superadmins can retry.
 - **Append-only audit log** — who did what, to which file, when, and from which
   IP. No edit/delete path is exposed through the API.
-- **Admin console** — manage users & roles, review the audit log, inspect jobs,
-  and empty the recycle bin.
+- **Admin console** — create accounts, reset passwords, disable leavers, delete
+  users while transferring their files, set storage quotas, review the audit log,
+  inspect jobs, and manage the system recycle bin.
 - **Prometheus metrics** — `/api/metrics` exposes request, error, cache, job, and
   queue-depth counters in standard exposition format (bearer-token secured).
 
@@ -142,6 +168,9 @@ A few design rules fall out of this:
 
 - **Better-Auth** username + password authentication with rate-limited sign-in /
   sign-up and Redis-backed sessions (DB never hit for session validation).
+- **Two-factor authentication** (TOTP + backup codes), password change, active
+  session list with remote sign-out, and an optional switch to disable public
+  sign-up.
 - **Strict environment contract** — every secret comes from the environment and is
   validated at boot; the app refuses to start half-configured.
 - **No SQL injection surface** — all data access goes through Prisma.
@@ -175,13 +204,20 @@ roles.
 | -------------------- | ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- |
 | Sign In               | `/sign-in`              | Authenticate with email/username + password                  | [README](<app/(auth)/sign-in/README.md>)                        |
 | Sign Up               | `/sign-up`              | Register a new account                                       | [README](<app/(auth)/sign-up/README.md>)                        |
-| Files                 | `/files`                | Date-grouped file browser, upload, bulk actions               | [README](<app/(app)/files/README.md>)                           |
-| File Detail           | `/files/[id]`           | Preview, sharing, tags, mentions, versioned notes             | [README](<app/(app)/files/[id]/README.md>)                      |
+| Files                 | `/files`                | File browser, folders, upload (files or folders), bulk actions | [README](<app/(app)/files/README.md>)                           |
+| Recent                | `/recent`               | Files you worked on in the last 30 days                       | —                                                               |
+| Starred               | `/starred`              | Your favourite files                                          | —                                                               |
+| Shared                | `/shared`               | Shared with me / shared by me (files and folders)             | —                                                               |
+| Groups                | `/groups`               | Teams and their members                                       | —                                                               |
+| Storage               | `/storage`              | Usage vs quota, breakdown, largest files, duplicates          | —                                                               |
+| File Detail           | `/files/[id]`           | Preview, sharing, versions, tags, mentions, notes, checksum   | [README](<app/(app)/files/[id]/README.md>)                      |
+| Shared link           | `/s/[token]`            | Public download page for a share link (no account needed)     | —                                                               |
+| Two-factor check      | `/two-factor`           | Second sign-in step for accounts with 2FA                     | —                                                               |
 | Search                | `/search`               | Full-text search by name, tag, or file type                  | [README](<app/(app)/search/README.md>)                          |
 | Notifications         | `/notifications`        | Mentions and collaborator activity feed                      | [README](<app/(app)/notifications/README.md>)                   |
 | Recycle Bin           | `/trash`                | Restore your own soft-deleted files within 30 days            | [README](<app/(app)/trash/README.md>)                           |
-| Settings & Account    | `/settings`             | Profile, theme, session, sign out                              | [README](<app/(app)/settings/README.md>)                        |
-| Users & Roles (admin) | `/admin/users`          | Manage every user's system role                               | [README](<app/(app)/admin/users/README.md>)                     |
+| Settings & Account    | `/settings`             | Profile & avatar, theme, password, 2FA, sessions, sign out      | [README](<app/(app)/settings/README.md>)                        |
+| Users & Accounts (admin) | `/admin/users`       | Create/disable/delete users, roles, passwords, quotas          | [README](<app/(app)/admin/users/README.md>)                     |
 | Audit Logs (admin)    | `/admin/audit`          | Append-only security audit trail (superadmin-only)             | [README](<app/(app)/admin/audit/README.md>)                     |
 | Background Jobs (admin) | `/admin/jobs`         | Queue health, job status, dead-letter queue (superadmin-only)  | [README](<app/(app)/admin/jobs/README.md>)                      |
 | Recycle Bin (admin)   | `/admin/recycle-bin`    | System-wide soft-deleted file recovery (superadmin-only)        | [README](<app/(app)/admin/recycle-bin/README.md>)               |
@@ -338,7 +374,11 @@ readable error.
 | `BETTER_AUTH_SECRET`                    |    ✅    | 32+ char random secret for signing sessions.                             |
 | `BETTER_AUTH_URL`                       |    ✅    | Public base URL Better-Auth runs under (no trailing slash).              |
 | `APP_URL`                               |    ✅    | Public base URL of the app.                                              |
-| `CRON_SECRET`                           |    –     | Bearer token guarding the TTL-expiry cron endpoint.                      |
+| `CRON_SECRET`                           |    ✅    | 16+ char bearer token guarding `/api/cron/expire` (manual maintenance).  |
+| `FILE_VERSION_LIMIT`                    |    –     | Previous versions kept per file (default `20`, `0` disables history).    |
+| `DEFAULT_STORAGE_QUOTA_MB`              |    –     | Default per-user quota in MiB (default `0` = unlimited).                 |
+| `ALLOW_SIGNUP`                          |    –     | `false` lets only admins create accounts (default `true`).               |
+| `TRUSTED_ORIGINS`                       |    –     | Extra comma-separated origins allowed to call auth endpoints.            |
 | `SUPERADMIN_*`                          |    –     | Optional non-interactive bootstrap for the first admin.                  |
 
 ### Switching a service between local and cloud

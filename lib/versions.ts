@@ -53,6 +53,7 @@ export async function replaceFileContent(input: {
   newObjectKey: string;
   mimeType: string;
   size: bigint;
+  sha256?: string | null;
   actorId: string;
 }): Promise<{ version: number }> {
   const file = await db.file.findUnique({ where: { id: input.fileId } });
@@ -68,6 +69,7 @@ export async function replaceFileContent(input: {
         objectKey: input.newObjectKey,
         mimeType: input.mimeType,
         size: input.size,
+        sha256: input.sha256 ?? null,
         version: file.version + 1,
         contentUploadedById: input.actorId,
         contentUpdatedAt: new Date(),
@@ -86,6 +88,7 @@ export async function replaceFileContent(input: {
           objectKey: file.objectKey,
           mimeType: file.mimeType,
           size: file.size,
+          sha256: file.sha256,
           uploadedById: previousUploader,
           uploadedAt: file.contentUpdatedAt,
         },
@@ -133,6 +136,7 @@ export async function restoreFileVersion(versionId: string, actorId: string) {
         objectKey: target.objectKey,
         mimeType: target.mimeType,
         size: target.size,
+        sha256: target.sha256,
         version: file.version + 1,
         contentUploadedById: actorId,
         contentUpdatedAt: new Date(),
@@ -150,6 +154,7 @@ export async function restoreFileVersion(versionId: string, actorId: string) {
         objectKey: file.objectKey,
         mimeType: file.mimeType,
         size: file.size,
+        sha256: file.sha256,
         uploadedById: previousUploader,
         uploadedAt: file.contentUpdatedAt,
       },

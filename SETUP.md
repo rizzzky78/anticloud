@@ -114,6 +114,13 @@ were uploaded before thumbnails existed (new uploads get one automatically):
 docker compose run --rm anticloud-worker bun run scripts/backfill-thumbnails.ts
 ```
 
+Likewise, compute SHA-256 checksums (used for integrity display and duplicate
+detection) for files stored before checksums existed:
+
+```bash
+docker compose run --rm anticloud-worker bun run scripts/backfill-checksums.ts
+```
+
 ---
 
 ## 6. Verify

@@ -5,10 +5,12 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
 import { buildObjectKey, putObjectCompensated } from "@/lib/storage";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { toApiError, statusFor } from "@/lib/result";
+import { AppError, toApiError, statusFor } from "@/lib/result";
 import { displayNameSchema, folderPathSchema, mimeTypeSchema } from "@/lib/paths";
 import { assertCanUpload } from "@/lib/folders";
 import { assertWithinQuota } from "@/lib/quota";
+import { hashStream } from "@/lib/checksum";
+import { findDuplicates } from "@/lib/duplicates";
 import type { Role } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -142,12 +144,22 @@ export async function POST(request: NextRequest) {
       body as Parameters<typeof Readable.fromWeb>[0],
     );
 
+    // Hash while streaming: one pass, no buffering (plan/phase-23).
+    const hashing = hashStream(nodeStream);
+    let sha256 = "";
+
     await putObjectCompensated(
       key,
-      nodeStream,
+      hashing.stream,
       size,
       { "Content-Type": mimeType },
       async () => {
+        // Integrity: the stored byte count must match the declared length.
+        if (hashing.bytes() !== size) {
+          throw AppError.badRequest("Upload was incomplete. Please try again.");
+        }
+        sha256 = hashing.digest();
+
         await db.file.create({
           data: {
             id,
@@ -157,6 +169,7 @@ export async function POST(request: NextRequest) {
             objectKey: key,
             mimeType,
             size: BigInt(size),
+            sha256,
             folderPath,
             visibility,
             guestAccess,
@@ -197,7 +210,15 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    return Response.json({ id }, { status: 201 });
+    // Tell the uploader about identical files they can already see.
+    const duplicates = await findDuplicates(
+      { id: session.user.id, role: session.user.role as string },
+      sha256,
+      id,
+      3,
+    ).catch(() => []);
+
+    return Response.json({ id, sha256, duplicates }, { status: 201 });
   } catch (err) {
     // AppErrors are expected/user-facing; anything else is an unexpected fault
     // (storage unreachable, bucket missing, DB constraint, …). Log those so the
