@@ -10,6 +10,8 @@ import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { displayNameSchema, folderPathSchema } from "@/lib/paths";
+import { assertCanUpload } from "@/lib/folders";
+import type { Role } from "@prisma/client";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -75,6 +77,7 @@ export async function moveFile(payload: unknown) {
   const { fileId, folderPath } = moveSchema.parse(payload);
   const file = await assertWriteAccess(session.user as SessionUser, fileId);
   assertNotReadOnly(file, session.user.role as string | undefined);
+  await assertCanUpload({ id: session.user.id, role: session.user.role as Role }, folderPath);
 
   await db.file.update({
     where: { id: fileId },
@@ -82,6 +85,10 @@ export async function moveFile(payload: unknown) {
   });
 
   await bustFileMeta(fileId);
+  // Folder grants are inherited, so a move can change who has access.
+  await invalidatePermCache(null, fileId);
+  const { invalidateUserSearchCache } = await import("@/lib/search");
+  await invalidateUserSearchCache();
   await recordAudit({
     action: "file.move",
     targetType: "file",

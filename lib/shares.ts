@@ -60,7 +60,10 @@ export async function listSharedWithMe(userId: string): Promise<SharedWithMeEntr
     where: {
       ...activeGrant(now),
       group: { members: { some: { userId } } },
-      file: { ...liveFile(now), NOT: { ownerId: userId } },
+      file: {
+        ...liveFile(now),
+        AND: [{ OR: [{ ownerId: null }, { ownerId: { not: userId } }] }],
+      },
     },
     orderBy: { updatedAt: "desc" },
     take: 500,
@@ -177,4 +180,52 @@ export async function listSharedByMe(userId: string): Promise<SharedByMeEntry[]>
     activeLinks: f._count.shareLinks,
     updatedAt: f.updatedAt.toISOString(),
   }));
+}
+
+/** A folder shared with the current user (directly or via a group). */
+export interface SharedFolderEntry {
+  path: string;
+  name: string;
+  role: string;
+  viaGroup: string | null;
+  sharedBy: string | null;
+  owner: string | null;
+  expiresAt: string | null;
+}
+
+/** Folder shares reaching `userId`, one entry per folder at its highest level. */
+export async function listFoldersSharedWithMe(userId: string): Promise<SharedFolderEntry[]> {
+  const now = new Date();
+  const shares = await db.folderPermission.findMany({
+    where: {
+      ...activeGrant(now),
+      AND: [
+        { OR: [{ userId }, { group: { members: { some: { userId } } } }] },
+        { folder: { OR: [{ ownerId: null }, { ownerId: { not: userId } }] } },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+    include: {
+      folder: { select: { path: true, name: true, owner: { select: { name: true } } } },
+      group: { select: { name: true } },
+      grantedBy: { select: { name: true } },
+    },
+  });
+
+  const byPath = new Map<string, SharedFolderEntry>();
+  for (const s of shares) {
+    const entry: SharedFolderEntry = {
+      path: s.folder.path,
+      name: s.folder.name,
+      role: s.role,
+      viaGroup: s.group?.name ?? null,
+      sharedBy: s.grantedBy?.name ?? null,
+      owner: s.folder.owner?.name ?? null,
+      expiresAt: s.expiresAt?.toISOString() ?? null,
+    };
+    const current = byPath.get(entry.path);
+    if (!current || RANK[entry.role] > RANK[current.role]) byPath.set(entry.path, entry);
+  }
+  return Array.from(byPath.values());
 }

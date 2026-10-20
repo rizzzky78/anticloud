@@ -50,6 +50,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P15 — Groups
 - [x] 15.1 schema · 15.2 resolver · 15.3 group management · 15.4 group sharing
 
+## P16 — Folders as entities
+- [x] 16.1 schema · 16.2 inherited access · 16.3 folder operations · 16.4 folder sharing · 16.5 UI
+
 ---
 
 # UI Progress

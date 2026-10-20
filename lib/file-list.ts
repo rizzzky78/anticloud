@@ -263,7 +263,43 @@ export async function listUserFolderPaths(
     FROM "file" f
     WHERE ${accessibleFilesSql(user)}
   `;
-  return rows.map((r) => r.folder_path);
+  const paths = new Set(rows.map((r) => r.folder_path));
+  if (user) {
+    for (const path of await listVisibleFolderRows(user)) paths.add(path);
+  }
+  return Array.from(paths);
+}
+
+/**
+ * Folder entities (plan/phase-16) the user can see even when they hold no
+ * visible files: folders they own or that sit inside a folder they own or
+ * that is shared with them (directly or via a group). Superadmins see all.
+ */
+async function listVisibleFolderRows(user: { id: string; role: string }): Promise<string[]> {
+  if (user.role === "SUPERADMIN") {
+    const all = await db.folder.findMany({ select: { path: true } });
+    return all.map((f) => f.path);
+  }
+  const rows = await db.$queryRaw<{ path: string }[]>`
+    SELECT fo.path FROM folder fo
+    WHERE EXISTS (
+      SELECT 1 FROM folder anc
+      WHERE (fo.path = anc.path OR starts_with(fo.path, anc.path || '/'))
+        AND (
+          anc."ownerId" = ${user.id}
+          OR EXISTS (
+            SELECT 1 FROM folder_permission fop
+            WHERE fop."folderId" = anc.id
+              AND (fop."expiresAt" IS NULL OR fop."expiresAt" > NOW())
+              AND (
+                fop."userId" = ${user.id}
+                OR fop."groupId" IN (SELECT gm."groupId" FROM group_member gm WHERE gm."userId" = ${user.id})
+              )
+          )
+        )
+    )
+  `;
+  return rows.map((r) => r.path);
 }
 
 export async function listSubfolders(

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { db } from "@/lib/db";
-import { accessibleFilesWhere } from "@/lib/permissions";
+import { filterAccessibleFileIds } from "@/lib/permissions";
 import { getObjectStream } from "@/lib/storage";
 import { Readable } from "node:stream";
 import { ZipArchive } from "archiver";
@@ -60,17 +60,13 @@ export async function POST(req: Request) {
     //    (central predicate: excludes soft-deleted, expired, and
     //    mention-restricted files the caller is not mentioned on).
     const user = { id: session.user.id, role: session.user.role as string };
-    const [files, permitted] = await Promise.all([
+    const [files, permittedIds] = await Promise.all([
       db.file.findMany({
         where: { id: { in: fileIds } },
         select: { id: true, displayName: true, objectKey: true },
       }),
-      db.file.findMany({
-        where: { AND: [{ id: { in: fileIds } }, accessibleFilesWhere(user)] },
-        select: { id: true },
-      }),
+      filterAccessibleFileIds(user, fileIds),
     ]);
-    const permittedIds = new Set(permitted.map((f) => f.id));
 
     // We will build a stream of a ZIP file directly back to the client.
     // archiver v8 exposes named format classes (ESM); the old

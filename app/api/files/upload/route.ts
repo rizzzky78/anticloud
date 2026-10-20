@@ -7,6 +7,8 @@ import { buildObjectKey, putObjectCompensated } from "@/lib/storage";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { toApiError, statusFor } from "@/lib/result";
 import { displayNameSchema, folderPathSchema, mimeTypeSchema } from "@/lib/paths";
+import { assertCanUpload } from "@/lib/folders";
+import type { Role } from "@prisma/client";
 
 export const runtime = "nodejs";
 
@@ -121,6 +123,12 @@ export async function POST(request: NextRequest) {
 
     const { key, id } = buildObjectKey();
     const { displayName, mimeType, folderPath, visibility, expiresAt } = parsed.data;
+
+    // Folders owned by someone else only accept uploads from editors+.
+    await assertCanUpload(
+      { id: session.user.id, role: session.user.role as Role },
+      folderPath,
+    );
     // Guest access only applies to PUBLIC files.
     const guestAccess = visibility === "PUBLIC" && parsed.data.guestAccess;
 

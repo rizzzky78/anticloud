@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { Share2Icon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth-context";
-import { listSharedByMe, listSharedWithMe } from "@/lib/shares";
+import { listFoldersSharedWithMe, listSharedByMe, listSharedWithMe } from "@/lib/shares";
 import { SharedClient } from "./shared-client";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +10,10 @@ export default async function SharedPage() {
   const session = await getCurrentUser();
   if (!session) redirect("/sign-in");
 
-  const [withMe, byMe] = await Promise.all([
+  const [withMe, byMe, folders] = await Promise.all([
     listSharedWithMe(session.user.id),
     listSharedByMe(session.user.id),
+    listFoldersSharedWithMe(session.user.id),
   ]);
 
   return (
@@ -26,7 +27,7 @@ export default async function SharedPage() {
         </p>
       </div>
 
-      <SharedClient withMe={withMe} byMe={byMe} />
+      <SharedClient withMe={withMe} byMe={byMe} folders={folders} />
     </div>
   );
 }

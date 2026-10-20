@@ -8,6 +8,10 @@ import {
   listUserFolderPaths,
 } from "@/lib/file-list";
 import { FileList } from "@/components/file-list";
+import { FolderToolbar } from "@/components/folder-toolbar";
+import { getFolderAccess } from "@/lib/folders";
+import { normalizeFolderPath } from "@/lib/paths";
+import type { Role } from "@prisma/client";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -38,7 +42,9 @@ export default async function FilesPage({ searchParams }: PageProps) {
     redirect("/sign-in");
   }
 
-  const { folderPath = "/", page = "1", pageSize = "50" } = await searchParams;
+  const params = await searchParams;
+  const folderPath = normalizeFolderPath(params.folderPath ?? "/") ?? "/";
+  const { page = "1", pageSize = "50" } = params;
 
   const currentPage = Math.max(1, parseInt(page, 10));
   const limit = Math.min(200, Math.max(1, parseInt(pageSize, 10)));
@@ -47,10 +53,11 @@ export default async function FilesPage({ searchParams }: PageProps) {
   const user = { id: session.user.id, role: session.user.role as string };
 
   // Fetch data concurrently
-  const [buckets, subfolders, folderPaths] = await Promise.all([
+  const [buckets, subfolders, folderPaths, folderAccess] = await Promise.all([
     listFilesGrouped(user, { folderPath, pageSize: limit, offset }),
     listSubfolders(user, folderPath),
     listUserFolderPaths(user),
+    getFolderAccess({ id: user.id, role: user.role as Role }, folderPath),
   ]);
 
   // Build breadcrumbs
@@ -72,7 +79,7 @@ export default async function FilesPage({ searchParams }: PageProps) {
   return (
     <div className="flex flex-1 flex-col gap-6">
       {/* Page Header with Breadcrumbs */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2">
           <Breadcrumb>
             <BreadcrumbList>
@@ -100,6 +107,14 @@ export default async function FilesPage({ searchParams }: PageProps) {
             </BreadcrumbList>
           </Breadcrumb>
         </div>
+        <FolderToolbar
+          currentFolderPath={folderPath}
+          folderPaths={folderPaths}
+          canUpload={folderAccess.canUpload}
+          canManage={folderAccess.canManage}
+          ownerName={folderAccess.ownerName}
+          isOwner={folderAccess.ownerId === user.id}
+        />
       </div>
 
       {/* File List Grid & Tables */}

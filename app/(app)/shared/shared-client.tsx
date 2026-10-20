@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Link2, LogOut, Search, Users, UsersRound } from "lucide-react";
+import { FolderIcon, Link2, LogOut, Search, Users, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import {
 import { getFileIcon } from "@/components/file-list-types";
 import { formatBytes, formatDate, formatRelativeDate } from "@/lib/format";
 import { leaveShare } from "@/actions/roles";
-import type { SharedByMeEntry, SharedWithMeEntry } from "@/lib/shares";
+import type { SharedByMeEntry, SharedFolderEntry, SharedWithMeEntry } from "@/lib/shares";
 
 const ROLE_LABEL: Record<string, string> = {
   VIEWER: "Viewer",
@@ -33,6 +33,7 @@ const ROLE_LABEL: Record<string, string> = {
 interface SharedClientProps {
   withMe: SharedWithMeEntry[];
   byMe: SharedByMeEntry[];
+  folders: SharedFolderEntry[];
 }
 
 function FileCell({ id, name, mimeType }: { id: string; name: string; mimeType: string }) {
@@ -63,7 +64,7 @@ function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-export function SharedClient({ withMe, byMe }: SharedClientProps) {
+export function SharedClient({ withMe, byMe, folders }: SharedClientProps) {
   const [query, setQuery] = useState("");
   const [incoming, setIncoming] = useState(withMe);
   const [isPending, startTransition] = useTransition();
@@ -102,7 +103,33 @@ export function SharedClient({ withMe, byMe }: SharedClientProps) {
         </div>
       </div>
 
-      <TabsContent value="with-me">
+      <TabsContent value="with-me" className="space-y-4">
+        {folders.filter((f) => f.name.toLowerCase().includes(q)).length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {folders
+              .filter((f) => f.name.toLowerCase().includes(q))
+              .map((f) => (
+                <Link
+                  key={f.path}
+                  href={`/files?folderPath=${encodeURIComponent(f.path)}`}
+                  className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm hover:bg-muted/40"
+                >
+                  <div className="rounded bg-muted p-2">
+                    <FolderIcon className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{f.name}</p>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {ROLE_LABEL[f.role] ?? f.role}
+                      {f.viaGroup ? ` · via ${f.viaGroup}` : ""}
+                      {f.owner ? ` · ${f.owner}` : ""}
+                      {f.expiresAt ? ` · until ${formatDate(f.expiresAt)}` : ""}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+          </div>
+        )}
         <Card className="py-0">
           <CardContent className="p-0">
             <Table>

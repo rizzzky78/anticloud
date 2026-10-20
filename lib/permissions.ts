@@ -2,6 +2,7 @@ import { Prisma, Role, File, User } from "@prisma/client";
 import { AppError } from "@/lib/result";
 import { redis, redisKey, NS } from "@/lib/redis";
 import { db } from "@/lib/db";
+import { folderGrantForPath } from "@/lib/folders";
 
 export type AccessLevel = Role;
 
@@ -38,8 +39,9 @@ type UserWithRole = Pick<User, "id" | "role">;
  *   1. SUPERADMIN bypass.
  *   2. Owner → ADMIN.
  *   3. Unowned file + global ADMIN → ADMIN (orphan management).
- *   4. Explicit per-file grant (VIEWER / EDITOR / ADMIN) — direct or via a
- *      group the user belongs to (highest wins). Grants let a file
+ *   4. Explicit grant (VIEWER / EDITOR / ADMIN) — on the file directly, via a
+ *      group the user belongs to, or inherited from a containing folder
+ *      (folder owner = ADMIN, folder shares cascade). Highest wins. Grants let a file
  *      owner share beyond the recipient's system role, except that system
  *      GUESTs stay read-only and no grant confers SUPERADMIN.
  *   5. Mention-restriction gate (applies only to visibility-derived access).
@@ -98,7 +100,13 @@ export async function getCachedAccess(
 
   const file = await db.file.findUnique({
     where: { id: fileId },
-    select: { ownerId: true, visibility: true, guestAccess: true, isMentionRestricted: true },
+    select: {
+      ownerId: true,
+      folderPath: true,
+      visibility: true,
+      guestAccess: true,
+      isMentionRestricted: true,
+    },
   });
   if (!file) throw AppError.notFound("File not found");
 
@@ -108,7 +116,7 @@ export async function getCachedAccess(
 
   if (user && user.role !== "SUPERADMIN" && file.ownerId !== user.id) {
     const now = new Date();
-    const [perm, groupGrants] = await Promise.all([
+    const [perm, groupGrants, folderGrant] = await Promise.all([
       db.filePermission.findUnique({
         where: { fileId_userId: { fileId, userId: user.id } },
         select: { role: true, expiresAt: true },
@@ -121,12 +129,17 @@ export async function getCachedAccess(
         },
         select: { role: true, expiresAt: true },
       }),
+      folderGrantForPath(user, file.folderPath),
     ]);
 
-    // Highest of the direct grant and every group grant the user inherits.
+    // Highest of the direct grant, every group grant the user inherits, and
+    // grants from containing folders (ownership or folder shares).
     const grants = [
       ...(perm && (!perm.expiresAt || perm.expiresAt > now) ? [perm] : []),
       ...groupGrants,
+      ...(folderGrant.level
+        ? [{ role: folderGrant.level, expiresAt: folderGrant.earliestExpiry }]
+        : []),
     ];
     for (const grant of grants) {
       explicitGrantLevel = maxLevel(explicitGrantLevel, grant.role);
@@ -233,6 +246,22 @@ export function accessibleFilesSql(user: ListUser): Prisma.Sql {
       WHERE fgp."fileId" = f.id AND gm."userId" = ${user.id}
         AND (fgp."expiresAt" IS NULL OR fgp."expiresAt" > NOW())
     )
+    OR EXISTS (
+      SELECT 1 FROM folder fo
+      WHERE (f."folderPath" = fo.path OR starts_with(f."folderPath", fo.path || '/'))
+        AND (
+          fo."ownerId" = ${user.id}
+          OR EXISTS (
+            SELECT 1 FROM folder_permission fop
+            WHERE fop."folderId" = fo.id
+              AND (fop."expiresAt" IS NULL OR fop."expiresAt" > NOW())
+              AND (
+                fop."userId" = ${user.id}
+                OR fop."groupId" IN (SELECT gm2."groupId" FROM group_member gm2 WHERE gm2."userId" = ${user.id})
+              )
+          )
+        )
+    )
     OR (
       f.visibility = 'PUBLIC'
       AND (
@@ -243,50 +272,18 @@ export function accessibleFilesSql(user: ListUser): Prisma.Sql {
   )`;
 }
 
-/** Prisma `where` equivalent of `accessibleFilesSql`. */
-export function accessibleFilesWhere(user: ListUser): Prisma.FileWhereInput {
-  const live: Prisma.FileWhereInput = {
-    deletedAt: null,
-    OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-  };
-
-  if (!user) {
-    return {
-      AND: [
-        live,
-        { visibility: "PUBLIC", guestAccess: true, isMentionRestricted: false },
-      ],
-    };
-  }
-  if (user.role === "SUPERADMIN") return live;
-
-  const scope: Prisma.FileWhereInput[] = [
-    { ownerId: user.id },
-    {
-      permissions: {
-        some: {
-          userId: user.id,
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-      },
-    },
-    {
-      groupPermissions: {
-        some: {
-          group: { members: { some: { userId: user.id } } },
-          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-        },
-      },
-    },
-    {
-      visibility: "PUBLIC",
-      OR: [
-        { isMentionRestricted: false },
-        { mentions: { some: { mentionedUserId: user.id } } },
-      ],
-    },
-  ];
-  if (user.role === "ADMIN") scope.push({ ownerId: null });
-
-  return { AND: [live, { OR: scope }] };
+/**
+ * Of the given file ids, return those the user can read (live files only).
+ * Built on `accessibleFilesSql`, so it honors every grant source.
+ */
+export async function filterAccessibleFileIds(
+  user: ListUser,
+  fileIds: string[],
+): Promise<Set<string>> {
+  if (fileIds.length === 0) return new Set();
+  const rows = await db.$queryRaw<{ id: string }[]>`
+    SELECT f.id FROM "file" f
+    WHERE f.id = ANY(${fileIds}::text[]) AND ${accessibleFilesSql(user)}
+  `;
+  return new Set(rows.map((r) => r.id));
 }

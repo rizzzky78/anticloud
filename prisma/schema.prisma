@@ -93,6 +93,9 @@ model User {
   groupMemberships GroupMember[]
   groupsCreated    Group[]         @relation("GroupCreator")
   groupGrantsGiven FileGroupPermission[] @relation("GroupPermissionGrantedBy")
+  foldersOwned     Folder[]        @relation("FolderOwner")
+  folderGrants     FolderPermission[] @relation("FolderPermissionUser")
+  folderGrantsGiven FolderPermission[] @relation("FolderPermissionGrantedBy")
 
   @@index([role])
   @@map("user")
@@ -288,6 +291,7 @@ model Group {
 
   members     GroupMember[]
   permissions FileGroupPermission[]
+  folderPermissions FolderPermission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -332,6 +336,55 @@ model FileGroupPermission {
   @@unique([fileId, groupId])
   @@index([groupId])
   @@map("file_group_permission")
+}
+
+/// A folder as a first-class entity (plan/phase-16). Files still reference
+/// their location by `File.folderPath`; a Folder row adds an owner, lets the
+/// folder exist while empty, and carries folder-level shares that apply to
+/// every file in its subtree. Paths are normalized (`/a/b`) and globally unique.
+model Folder {
+  id   String @id @default(cuid())
+  path String @unique
+  name String
+
+  ownerId String?
+  owner   User?   @relation("FolderOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  permissions FolderPermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@map("folder")
+}
+
+/// Folder share to one user OR one group; inherited by every file and folder
+/// below the shared folder.
+model FolderPermission {
+  id       String @id @default(cuid())
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  userId  String?
+  user    User?   @relation("FolderPermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+  groupId String?
+  group   Group?  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  role      Role
+  expiresAt DateTime?
+
+  grantedById String?
+  grantedBy   User?   @relation("FolderPermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([folderId, userId])
+  @@unique([folderId, groupId])
+  @@index([userId])
+  @@index([groupId])
+  @@map("folder_permission")
 }
 
 /// Public share link (plan/phase-14): anyone holding the token can view and
