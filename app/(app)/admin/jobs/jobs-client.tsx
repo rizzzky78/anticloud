@@ -12,7 +12,10 @@ import {
   AlertTriangle,
   Layers,
   Search,
+  RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
+import { retryDeadJob } from "@/actions/jobs";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -63,6 +66,24 @@ export function JobsClient({
   cacheHitRate,
 }: JobsClientProps) {
   const [jobs, setJobs] = useState<JobItem[]>(initialJobs);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const handleRetry = async (jobId: string) => {
+    setRetryingId(jobId);
+    try {
+      await retryDeadJob({ jobId });
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === jobId ? { ...j, status: "PENDING", attempts: 0, error: null } : j,
+        ),
+      );
+      toast.success("Job re-queued");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to retry job");
+    } finally {
+      setRetryingId(null);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedJob, setSelectedJob] = useState<JobItem | null>(null);
   const [activeTab, setActiveTab] = useState<string>("all");
@@ -337,7 +358,19 @@ export function JobsClient({
                         <TableCell className="text-xs text-muted-foreground">
                           {formatRelativeDate(job.createdAt)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right whitespace-nowrap">
+                          {(job.status === "DEAD_LETTER" || job.status === "FAILED") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={retryingId === job.id}
+                              onClick={() => handleRetry(job.id)}
+                              className="h-8 w-8 cursor-pointer hover:bg-muted text-muted-foreground hover:text-foreground"
+                            >
+                              <RotateCcw className="size-4" />
+                              <span className="sr-only">Retry Job</span>
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

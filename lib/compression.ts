@@ -2,6 +2,36 @@ import { createGzip } from 'node:zlib';
 import { getObjectStream, putObjectCompensated, buildObjectKey, statObject, KeyPrefix } from './storage';
 import { db } from './db';
 
+const COMPRESSED_TYPES = new Set([
+  "application/gzip",
+  "application/x-gzip",
+  "application/zip",
+  "application/x-7z-compressed",
+  "application/x-rar-compressed",
+  "application/vnd.rar",
+  "application/x-bzip2",
+  "application/x-xz",
+  "application/zstd",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+/** True for formats that are already compressed (gzip gains ~nothing). */
+export function isAlreadyCompressed(mimeType: string): boolean {
+  const t = mimeType.split(";")[0].trim().toLowerCase();
+  if (COMPRESSED_TYPES.has(t)) return true;
+  // Lossy audio/video codecs are compressed; uncompressed WAV is the exception.
+  if (t.startsWith("video/")) return true;
+  if (t.startsWith("audio/") && t !== "audio/wav" && t !== "audio/x-wav") return true;
+  return false;
+}
+
 /**
  * Handle a COMPRESSION job.
  * Downloads the file, compresses via gzip, uploads as a derived file.
@@ -10,10 +40,10 @@ export async function compressFile(jobId: string, fileId: string): Promise<{ der
   const originalFile = await db.file.findUnique({ where: { id: fileId } });
   if (!originalFile) throw new Error("Original file not found");
 
-  // Prevent double compression or compressing something that's already compressed
-  // In a full implementation, we'd check mimeType or extensions.
-  if (originalFile.mimeType === "application/gzip") {
-    throw new Error("File is already compressed");
+  // Gzip cannot meaningfully shrink formats that are already compressed;
+  // refuse them instead of burning CPU to produce a same-size copy.
+  if (isAlreadyCompressed(originalFile.mimeType)) {
+    throw new Error("File type is already compressed");
   }
 
   const { key: newKey, id: newFileId } = buildObjectKey({ prefix: KeyPrefix.derived });

@@ -8,6 +8,7 @@ import { enqueueJob } from "@/lib/jobs";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { bustFileMeta } from "@/lib/file-meta";
+import { isAlreadyCompressed } from "@/lib/compression";
 
 const compressSchema = z.object({
   fileId: z.string().min(1),
@@ -20,7 +21,10 @@ export async function compress(payload: unknown) {
   const { fileId } = compressSchema.parse(payload);
   
   // Need write access to compress (it creates a derived file owned by same user)
-  await assertWriteAccess(session.user as any, fileId);
+  const file = await assertWriteAccess(session.user as any, fileId);
+  if (isAlreadyCompressed(file.mimeType)) {
+    throw AppError.badRequest("This file type is already compressed");
+  }
 
   const job = await enqueueJob({
     type: "COMPRESSION",

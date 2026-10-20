@@ -191,13 +191,9 @@ export function UploadDialog({
 
     xhr.setRequestHeader("Content-Length", item.file.size.toString());
 
-    let displayName = item.file.name;
-    try {
-      xhr.setRequestHeader("X-Display-Name", displayName);
-    } catch {
-      displayName = displayName.replace(/[^\x00-\x7F]/g, "_");
-      xhr.setRequestHeader("X-Display-Name", displayName);
-    }
+    // Headers are ASCII-only: names and folders travel URI-encoded and the
+    // server decodes them, so non-Latin file names survive intact.
+    xhr.setRequestHeader("X-Display-Name", encodeURIComponent(item.file.name));
 
     xhr.setRequestHeader(
       "Content-Type",
@@ -209,7 +205,7 @@ export function UploadDialog({
       cleanFolder = "/" + cleanFolder;
     }
     cleanFolder = cleanFolder.replace(/\/+/g, "/");
-    xhr.setRequestHeader("X-Folder-Path", cleanFolder);
+    xhr.setRequestHeader("X-Folder-Path", encodeURIComponent(cleanFolder));
     xhr.setRequestHeader("X-Visibility", visibility);
     xhr.setRequestHeader(
       "X-Guest-Access",

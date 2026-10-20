@@ -24,6 +24,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { recoverFile } from "@/actions/file-config";
+import { PermanentDeleteButton } from "@/components/permanent-delete-button";
 import { formatBytes, formatDate } from "@/lib/format";
 
 interface DeletedFileItem {
@@ -116,7 +117,7 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
                 <TableHead>Deleted At</TableHead>
                 <TableHead>Time Remaining</TableHead>
                 <TableHead>Original Owner</TableHead>
-                <TableHead className="text-right w-[120px]">Actions</TableHead>
+                <TableHead className="text-right w-[200px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -188,7 +189,14 @@ export function RecycleBinClient({ initialFiles }: RecycleBinClientProps) {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap space-x-1">
+                        <PermanentDeleteButton
+                          fileId={file.id}
+                          displayName={file.displayName}
+                          onDeleted={(id) =>
+                            setFiles((prev) => prev.filter((f) => f.id !== id))
+                          }
+                        />
                         <Button
                           variant="outline"
                           size="xs"

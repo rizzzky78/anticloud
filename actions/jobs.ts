@@ -3,7 +3,8 @@
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
-import { getJobStatus } from "@/lib/jobs";
+import { getJobStatus, retryJob } from "@/lib/jobs";
+import { recordAudit } from "@/lib/audit";
 
 const getJobSchema = z.object({
   jobId: z.string().min(1),
@@ -47,9 +48,42 @@ export async function getJob(payload: unknown) {
     attempts: job.attempts,
     maxAttempts: job.maxAttempts,
     error: job.error,
-    result: job.result,
+    result: publicJobResult(job.result),
     startedAt: job.startedAt?.toISOString() ?? null,
     completedAt: job.completedAt?.toISOString() ?? null,
     createdAt: job.createdAt.toISOString(),
   };
+}
+
+/** Strip storage internals (object keys) from a job result before it reaches the client. */
+function publicJobResult(result: unknown) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return result;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { archiveKey, ...rest } = result as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * Re-queue a FAILED or DEAD_LETTER job. SUPERADMIN only.
+ */
+export async function retryDeadJob(payload: unknown) {
+  const session = await getCurrentUser();
+  if (!session) throw AppError.unauthorized();
+  if ((session.user.role as string) !== "SUPERADMIN") throw AppError.forbidden();
+
+  const { jobId } = getJobSchema.parse(payload);
+  const job = await getJobStatus(jobId);
+  if (!job) throw AppError.notFound("Job not found");
+  if (job.status !== "DEAD_LETTER" && job.status !== "FAILED") {
+    throw AppError.badRequest("Only failed or dead-lettered jobs can be retried");
+  }
+
+  await retryJob(jobId);
+  await recordAudit({
+    actorId: session.user.id,
+    action: "job.retry",
+    targetType: "job",
+    targetId: jobId,
+  });
+  return { jobId };
 }

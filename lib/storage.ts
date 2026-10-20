@@ -152,3 +152,25 @@ export async function putObjectCompensated(
     throw err;
   }
 }
+
+/** Iterate every object under a key prefix (recursive). */
+export async function* listObjects(
+  prefix: string,
+): AsyncGenerator<{ name: string; lastModified: Date; size: number }> {
+  const stream = storage.listObjectsV2(BUCKET, prefix, true);
+  for await (const item of stream as AsyncIterable<{
+    name?: string;
+    lastModified?: Date;
+    size?: number;
+  }>) {
+    if (item.name && item.lastModified) {
+      yield { name: item.name, lastModified: item.lastModified, size: item.size ?? 0 };
+    }
+  }
+}
+
+/** Remove many objects; missing keys are ignored. */
+export async function removeObjects(keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  await storage.removeObjects(BUCKET, keys);
+}

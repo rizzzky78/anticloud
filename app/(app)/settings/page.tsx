@@ -100,24 +100,15 @@ export default function SettingsPage() {
     const toastId = toast.loading("Updating profile...");
 
     try {
-      if (name !== user.name) {
-        const { error } = await authClient.updateUser({ name });
-        if (error) throw new Error(error.message || "Failed to update name");
-      }
+      // The username plugin extends update-user with a validated, uniqueness-
+      // checked `username` field, so both fields go in one request.
+      const updates: { name?: string; username?: string } = {};
+      if (name !== user.name) updates.name = name;
+      if (username !== userObj.username) updates.username = username;
 
-      if (username !== userObj.username) {
-        const client = authClient as any;
-        if (typeof client.changeUsername === "function") {
-          const { error } = await client.changeUsername({
-            newUsername: username,
-          });
-          if (error)
-            throw new Error(error.message || "Failed to update username");
-        } else {
-          toast.warning(
-            "Username update not fully supported by auth client configuration.",
-          );
-        }
+      if (Object.keys(updates).length > 0) {
+        const { error } = await authClient.updateUser(updates);
+        if (error) throw new Error(error.message || "Failed to update profile");
       }
 
       toast.success("Profile updated successfully!", { id: toastId });

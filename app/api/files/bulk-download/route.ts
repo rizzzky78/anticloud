@@ -8,6 +8,7 @@ import { getObjectStream } from "@/lib/storage";
 import { Readable } from "node:stream";
 import { ZipArchive } from "archiver";
 import { enqueueJob } from "@/lib/jobs";
+import { createZipNamer } from "@/lib/zip-names";
 
 // Hard-depends on the Node runtime: node:stream (Readable.toWeb), archiver, and
 // MinIO object streams are unavailable on the Edge runtime.
@@ -98,6 +99,7 @@ export async function POST(req: Request) {
     });
 
     let manifest = "Bulk Download Manifest\n\n";
+    const entryName = createZipNamer();
 
     // Append entries and finalize. archiver emits data as the client consumes
     // it; Readable.toWeb() below applies proper backpressure, so we must NOT
@@ -119,7 +121,7 @@ export async function POST(req: Request) {
 
         try {
           const stream = await getObjectStream(file.objectKey);
-          archive.append(stream, { name: file.displayName });
+          archive.append(stream, { name: entryName(file.displayName) });
           manifest += `[INCLUDED] ${file.displayName}\n`;
         } catch (err: any) {
           manifest += `[EXCLUDED] ${file.displayName}: Storage error (${err.message})\n`;

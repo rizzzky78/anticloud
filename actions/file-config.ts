@@ -10,9 +10,11 @@ import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
 import { env } from "@/lib/env";
 import { recordAudit } from "@/lib/audit";
+import { TRASH_RETENTION_MS, hardDeleteFile } from "@/lib/maintenance";
+import { invalidateUserSearchCache } from "@/lib/search";
 
-// Superadmin recovery window for soft-deleted files (phase-09 hard-deletes after this).
-const GRACE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+// Recovery window for soft-deleted files (the maintenance pass hard-deletes after this).
+const GRACE_WINDOW_MS = TRASH_RETENTION_MS;
 
 type SessionUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>["user"];
 
@@ -161,9 +163,12 @@ export async function recoverFile(payload: unknown) {
     );
   }
 
+  // An expired file restored from the bin would be re-trashed by the next
+  // maintenance pass; restoring clears a TTL that is already in the past.
+  const ttlElapsed = file.expiresAt !== null && file.expiresAt.getTime() <= Date.now();
   await db.file.update({
     where: { id: fileId },
-    data: { deletedAt: null },
+    data: { deletedAt: null, ...(ttlElapsed ? { expiresAt: null } : {}) },
   });
 
   await bustFileMeta(fileId);
@@ -202,9 +207,12 @@ export async function restoreFile(payload: unknown) {
     );
   }
 
+  // An expired file restored from the bin would be re-trashed by the next
+  // maintenance pass; restoring clears a TTL that is already in the past.
+  const ttlElapsed = file.expiresAt !== null && file.expiresAt.getTime() <= Date.now();
   await db.file.update({
     where: { id: fileId },
-    data: { deletedAt: null },
+    data: { deletedAt: null, ...(ttlElapsed ? { expiresAt: null } : {}) },
   });
 
   await bustFileMeta(fileId);
@@ -347,6 +355,37 @@ export async function setMentionRestricted(payload: unknown) {
     targetType: "file",
     targetId: fileId,
     metadata: { isMentionRestricted },
+  });
+  return { fileId };
+}
+
+// ─── Permanent deletion from the recycle bin ─────────────────────────────────
+
+/**
+ * Permanently delete a file that is already in the recycle bin: removes the
+ * binary (and every derived storage object) and the database row. Requires
+ * manage access; read-only files can only be purged by a SUPERADMIN.
+ */
+export async function deleteFilePermanently(payload: unknown) {
+  const session = await getCurrentUser();
+  if (!session) throw AppError.unauthorized();
+
+  const { fileId } = fileIdSchema.parse(payload);
+  const file = await assertWriteAccess(session.user as SessionUser, fileId, {
+    allowSoftDeleted: true,
+  });
+  if (!file.deletedAt) {
+    throw AppError.badRequest("Move the file to the recycle bin first");
+  }
+  assertNotReadOnly(file, session.user.role as string | undefined);
+
+  await hardDeleteFile(fileId);
+  await invalidateUserSearchCache();
+  await recordAudit({
+    action: "file.hard_delete",
+    targetType: "file",
+    targetId: fileId,
+    metadata: { displayName: file.displayName },
   });
   return { fileId };
 }

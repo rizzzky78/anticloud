@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { buildObjectKey, putObjectCompensated } from "@/lib/storage";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { toApiError, statusFor } from "@/lib/result";
+import { displayNameSchema, folderPathSchema, mimeTypeSchema } from "@/lib/paths";
 
 export const runtime = "nodejs";
 
@@ -17,9 +18,9 @@ const UPLOAD_RATE_MAX = 20;
 const UPLOAD_RATE_WINDOW = 60;
 
 const metaSchema = z.object({
-  displayName: z.string().min(1).max(255),
-  mimeType: z.string().min(1).max(127),
-  folderPath: z.string().default("/"),
+  displayName: displayNameSchema,
+  mimeType: mimeTypeSchema,
+  folderPath: folderPathSchema,
   visibility: z.enum(["PUBLIC", "PRIVATE"]).default("PRIVATE"),
   guestAccess: z.boolean().default(false),
   // Optional TTL: an ISO-8601 datetime in the future, or null for no expiry.
@@ -31,6 +32,19 @@ const metaSchema = z.object({
       message: "Expiration must be a future date",
     }),
 });
+
+/**
+ * Header values cannot carry raw non-ASCII; clients send names URI-encoded.
+ * Fall back to the raw value for clients that send plain ASCII.
+ */
+function decodeHeader(value: string | null): string | null {
+  if (value == null) return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 /**
  * POST /api/files/upload
@@ -85,9 +99,9 @@ export async function POST(request: NextRequest) {
     }
 
     const parsed = metaSchema.safeParse({
-      displayName: request.headers.get("x-display-name"),
+      displayName: decodeHeader(request.headers.get("x-display-name")),
       mimeType: request.headers.get("content-type") ?? "application/octet-stream",
-      folderPath: request.headers.get("x-folder-path") ?? "/",
+      folderPath: decodeHeader(request.headers.get("x-folder-path")) ?? "/",
       visibility: request.headers.get("x-visibility") ?? "PRIVATE",
       guestAccess: request.headers.get("x-guest-access") === "true",
       expiresAt: request.headers.get("x-expires-at") || null,

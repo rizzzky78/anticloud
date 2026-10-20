@@ -9,6 +9,7 @@ import { assertWriteAccess, assertNotReadOnly } from "@/lib/file-access";
 import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { displayNameSchema, folderPathSchema } from "@/lib/paths";
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ type SessionUser = NonNullable<
 
 const renameSchema = z.object({
   fileId: z.string().min(1),
-  displayName: z.string().min(1).max(255).trim(),
+  displayName: displayNameSchema,
 });
 
 /**
@@ -60,12 +61,7 @@ export async function renameFile(payload: unknown) {
 
 const moveSchema = z.object({
   fileId: z.string().min(1),
-  folderPath: z
-    .string()
-    .min(1)
-    .max(1024)
-    .regex(/^\//, "Folder path must start with /")
-    .trim(),
+  folderPath: folderPathSchema,
 });
 
 /**

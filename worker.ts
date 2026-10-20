@@ -1,6 +1,31 @@
-import { consumeJobs } from './lib/jobs';
+import { consumeJobs, promoteDueJobs, recoverAbandonedJobs } from './lib/jobs';
 import { compressFile } from './lib/compression';
+import { runMaintenance } from './lib/maintenance';
 import { Job } from '@prisma/client';
+
+/** How often delayed (backoff) jobs are checked for promotion. */
+const PROMOTE_INTERVAL_MS = 5_000;
+/** How often the maintenance pass (expiry, trash purge, archive cleanup) runs. */
+const MAINTENANCE_INTERVAL_MS = 15 * 60_000;
+
+function startSchedulers() {
+  setInterval(() => {
+    promoteDueJobs().catch((err) => console.error("[scheduler] promote failed:", err));
+  }, PROMOTE_INTERVAL_MS);
+
+  const maintain = () =>
+    runMaintenance()
+      .then((r) => {
+        if (r.ran && (r.expired || r.purged || r.archivesRemoved)) {
+          console.log(
+            `[maintenance] expired=${r.expired} purged=${r.purged} archives=${r.archivesRemoved}`,
+          );
+        }
+      })
+      .catch((err) => console.error("[maintenance] run failed:", err));
+  setTimeout(maintain, 30_000);
+  setInterval(maintain, MAINTENANCE_INTERVAL_MS);
+}
 
 /**
  * Worker entry point.
@@ -8,6 +33,10 @@ import { Job } from '@prisma/client';
  */
 async function main() {
   console.log("Starting background worker...");
+
+  const recovered = await recoverAbandonedJobs();
+  if (recovered > 0) console.log(`Recovered ${recovered} abandoned job(s).`);
+  startSchedulers();
 
   await consumeJobs(async (job: Job) => {
     console.log(`Processing job ${job.id} of type ${job.type}...`);
@@ -49,13 +78,15 @@ async function main() {
         const { PassThrough } = await import("node:stream");
         const passThroughStream = new PassThrough();
 
-        const { buildObjectKey, KeyPrefix, putObject, presignedGetUrl } = await import("./lib/storage");
+        const { buildObjectKey, KeyPrefix, putObject } = await import("./lib/storage");
         const { key: newKey } = buildObjectKey({ prefix: KeyPrefix.archive });
 
         // Start upload
         const uploadPromise = putObject(newKey, passThroughStream);
 
         let manifest = "Bulk Download Manifest\n\n";
+        const { createZipNamer } = await import("./lib/zip-names");
+        const entryName = createZipNamer();
 
         archive.pipe(passThroughStream);
 
@@ -72,7 +103,7 @@ async function main() {
           try {
             const { getObjectStream } = await import("./lib/storage");
             const stream = await getObjectStream(file.objectKey);
-            archive.append(stream, { name: file.displayName });
+            archive.append(stream, { name: entryName(file.displayName) });
             manifest += `[INCLUDED] ${file.displayName}\n`;
           } catch (err: any) {
             manifest += `[EXCLUDED] ${file.displayName}: Storage error (${err.message})\n`;
@@ -85,17 +116,19 @@ async function main() {
         // Wait for upload to complete
         await uploadPromise;
 
-        // Generate a 1-hour presigned URL
-        const downloadUrl = await presignedGetUrl(newKey, 3600);
-
-        return { success: true, downloadUrl };
+        // The archive is streamed back through the app (auth-checked) rather
+        // than a presigned storage URL: the storage endpoint is usually an
+        // internal host the browser cannot reach.
+        return {
+          success: true,
+          archiveKey: newKey,
+          downloadUrl: `/api/jobs/${job.id}/download`,
+        };
       }
 
       case "TTL_EXPIRY": {
-        // Normally TTL expiry is a cron endpoint `app/api/cron/expire/route.ts` 
-        // that hits MinIO and DB. If it's a job, process it here.
-        console.log("TTL_EXPIRY job triggered");
-        return { success: true };
+        const report = await runMaintenance();
+        return { success: true, ...report };
       }
 
       default:

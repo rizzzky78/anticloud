@@ -38,6 +38,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P11 — Security hardening
 - [x] 11.1 role input · 11.2 single resolver · 11.3 safe content · 11.4 data minimization · 11.5 collab gates · 11.6 HTTP deploy
 
+## P12 — Reliability & maintenance
+- [x] 12.1 job queue · 12.2 maintenance · 12.3 archive serving · 12.4 input normalization · 12.5 fixes · 12.6 telemetry
+
 ---
 
 # UI Progress

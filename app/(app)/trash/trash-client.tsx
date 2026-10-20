@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { restoreFile } from "@/actions/file-config";
+import { PermanentDeleteButton } from "@/components/permanent-delete-button";
 import { getFileIcon } from "@/components/file-list-types";
 import { formatBytes, formatDate } from "@/lib/format";
 import type { DeletedFileEntry } from "@/lib/file-list";
@@ -102,7 +103,7 @@ export function TrashClient({ initialFiles }: TrashClientProps) {
                 <TableHead className="hidden sm:table-cell">Size</TableHead>
                 <TableHead className="hidden md:table-cell">Deleted</TableHead>
                 <TableHead>Time Remaining</TableHead>
-                <TableHead className="text-right w-[120px]">Actions</TableHead>
+                <TableHead className="text-right w-[200px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -162,7 +163,14 @@ export function TrashClient({ initialFiles }: TrashClientProps) {
                           {remaining.text}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap space-x-1">
+                        <PermanentDeleteButton
+                          fileId={file.id}
+                          displayName={file.displayName}
+                          onDeleted={(id) =>
+                            setFiles((prev) => prev.filter((f) => f.id !== id))
+                          }
+                        />
                         <Button
                           variant="outline"
                           size="xs"

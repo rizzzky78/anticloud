@@ -82,7 +82,8 @@ services:
       start_period: 40s
 
   # ---------------------------------------------------------------------------
-  # Background worker — drains the Redis job queue (compression, bulk archive).
+  # Background worker — drains the Redis job queue (compression, bulk archive)
+  # and runs scheduled maintenance (TTL expiry, recycle-bin purge, archive GC).
   # Shares the same source/lockfile as the app but runs worker.ts. It does NOT
   # apply migrations (the web service owns that) and exposes no ports.
   # ---------------------------------------------------------------------------
