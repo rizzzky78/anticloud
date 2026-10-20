@@ -58,6 +58,8 @@ interface UploadDialogProps {
 interface UploadQueueItem {
   id: string;
   file: File;
+  /** Sub-path inside the target folder (folder uploads), e.g. `docs/2024`. */
+  relativeDir: string;
   progress: number;
   status: "waiting" | "uploading" | "success" | "error";
   errorMsg?: string;
@@ -78,6 +80,7 @@ export function UploadDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const activeXhrRef = useRef<XMLHttpRequest | null>(null);
 
   useEffect(() => {
@@ -124,9 +127,14 @@ export function UploadDialog({
         toast.error(`File ${file.name} exceeds the 2 GiB upload limit.`);
         continue;
       }
+      // Folder picks expose `webkitRelativePath` ("root/sub/file.txt"); keep
+      // the directory part so the tree is recreated under the target folder.
+      const relative = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? "";
+      const relativeDir = relative.split("/").slice(0, -1).join("/");
       newItems.push({
         id: Math.random().toString(36).substring(7),
         file,
+        relativeDir,
         progress: 0,
         status: "waiting",
       });
@@ -204,6 +212,7 @@ export function UploadDialog({
     if (!cleanFolder.startsWith("/")) {
       cleanFolder = "/" + cleanFolder;
     }
+    if (item.relativeDir) cleanFolder = `${cleanFolder}/${item.relativeDir}`;
     cleanFolder = cleanFolder.replace(/\/+/g, "/");
     xhr.setRequestHeader("X-Folder-Path", encodeURIComponent(cleanFolder));
     xhr.setRequestHeader("X-Visibility", visibility);
@@ -453,6 +462,29 @@ export function UploadDialog({
             />
           </div>
 
+          <div className="flex justify-center -mt-2">
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              disabled={isUploading}
+              onClick={() => folderInputRef.current?.click()}
+            >
+              Or upload a whole folder
+            </Button>
+            <input
+              type="file"
+              ref={folderInputRef}
+              onChange={(e) => {
+                handleFileSelect(e);
+                e.target.value = "";
+              }}
+              multiple
+              className="hidden"
+              {...({ webkitdirectory: "", directory: "" } as Record<string, string>)}
+            />
+          </div>
+
           {queue.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -470,9 +502,9 @@ export function UploadDialog({
                         <div className="flex justify-between items-center">
                           <span
                             className="font-medium truncate max-w-[250px]"
-                            title={item.file.name}
+                            title={item.relativeDir ? `${item.relativeDir}/${item.file.name}` : item.file.name}
                           >
-                            {item.file.name}
+                            {item.relativeDir ? `${item.relativeDir}/${item.file.name}` : item.file.name}
                           </span>
                           <span className="text-xs text-muted-foreground shrink-0 ml-2">
                             {formatBytes(item.file.size.toString())}

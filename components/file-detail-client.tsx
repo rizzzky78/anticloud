@@ -74,6 +74,7 @@ import {
 import { NoteHistoryDialog } from "@/components/note-history";
 import { FileSharingPanel } from "@/components/file-sharing-panel";
 import { FileVersionsPanel } from "@/components/file-versions-panel";
+import { StarButton } from "@/components/star-button";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
 import { compress, promoteDerivative } from "@/actions/compress";
 import { useJobs } from "@/components/jobs-context";
@@ -109,6 +110,7 @@ interface FileDetailClientProps {
   initialTags: string[];
   initialMentions: MentionedUser[];
   permissionLevel: string;
+  initialStarred?: boolean;
   initialDerivatives?: DerivedFile[];
   initialParentFile?: DerivedFile | null;
 }
@@ -121,6 +123,7 @@ export function FileDetailClient({
   initialTags,
   initialMentions,
   permissionLevel,
+  initialStarred = false,
   initialDerivatives = [],
   initialParentFile = null,
 }: FileDetailClientProps) {
@@ -384,6 +387,10 @@ export function FileDetailClient({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 self-start md:self-center">
+          {!isSoftDeleted && (
+            <StarButton fileId={file.id} initialStarred={initialStarred} className="size-9 border" />
+          )}
+
           {/* Download button - always shown */}
           <Button asChild className="shadow-xs">
             <a href={`/api/files/${file.id}?download=1`} download={file.displayName}>

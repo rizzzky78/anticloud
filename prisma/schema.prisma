@@ -96,6 +96,7 @@ model User {
   foldersOwned     Folder[]        @relation("FolderOwner")
   folderGrants     FolderPermission[] @relation("FolderPermissionUser")
   folderGrantsGiven FolderPermission[] @relation("FolderPermissionGrantedBy")
+  starredFiles     FileStar[]
 
   @@index([role])
   @@map("user")
@@ -217,6 +218,7 @@ model File {
   versions      FileVersion[]
   shareLinks    ShareLink[]
   groupPermissions FileGroupPermission[]
+  stars         FileStar[]
 
   @@index([ownerId])
   @@index([createdAt])
@@ -336,6 +338,20 @@ model FileGroupPermission {
   @@unique([fileId, groupId])
   @@index([groupId])
   @@map("file_group_permission")
+}
+
+/// A user's starred (favourite) file (plan/phase-17).
+model FileStar {
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([userId, fileId])
+  @@index([fileId])
+  @@map("file_star")
 }
 
 /// A folder as a first-class entity (plan/phase-16). Files still reference

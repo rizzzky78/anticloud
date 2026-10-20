@@ -23,6 +23,8 @@ export interface FileListEntry {
   guestAccess: boolean;
   isReadOnly: boolean;
   isMentionRestricted: boolean;
+  /** Starred by the requesting user (plan/phase-17). */
+  starred?: boolean;
   createdAt: string;
   updatedAt: string;
   bucket: BucketKey;
@@ -42,7 +44,13 @@ export interface ListOptions {
   pageSize?: number;
   /** Rows to skip (default 0). */
   offset?: number;
+  /** `date` (default) keeps date buckets; `name`/`size` return one sorted list. */
+  sort?: FileSort;
+  /** Sort direction (default: newest / A→Z / largest first as appropriate). */
+  dir?: "asc" | "desc";
 }
+
+export type FileSort = "date" | "name" | "size";
 
 // ─── Raw DB row returned by $queryRaw ─────────────────────────────────────────
 
@@ -57,6 +65,7 @@ interface RawFileRow {
   guest_access: boolean;
   is_read_only: boolean;
   is_mention_restricted: boolean;
+  is_starred: boolean;
   created_at: Date;
   updated_at: Date;
   bucket: string;
@@ -99,7 +108,12 @@ const BUCKET_EXPR = Prisma.sql`
   END
 `;
 
-const SELECT_COLS = Prisma.sql`
+/** Columns for listings; `is_starred` is resolved for the requesting user. */
+function selectCols(userId: string | null): Prisma.Sql {
+  const starredExpr = userId
+    ? Prisma.sql`EXISTS (SELECT 1 FROM file_star fs WHERE fs."fileId" = f.id AND fs."userId" = ${userId})`
+    : Prisma.sql`false`;
+  return Prisma.sql`
   f.id,
   f."ownerId"             AS owner_id,
   f."displayName"         AS display_name,
@@ -110,10 +124,31 @@ const SELECT_COLS = Prisma.sql`
   f."guestAccess"         AS guest_access,
   f."isReadOnly"          AS is_read_only,
   f."isMentionRestricted" AS is_mention_restricted,
+  ${starredExpr} AS is_starred,
   f."createdAt"           AS created_at,
   f."updatedAt"           AS updated_at,
   ${BUCKET_EXPR} AS bucket
 `;
+}
+
+function toEntry(r: RawFileRow): FileListEntry {
+  return {
+    id: r.id,
+    ownerId: r.owner_id,
+    displayName: r.display_name,
+    mimeType: r.mime_type,
+    size: r.size.toString(),
+    visibility: r.visibility,
+    folderPath: r.folder_path,
+    guestAccess: r.guest_access,
+    isReadOnly: r.is_read_only,
+    isMentionRestricted: r.is_mention_restricted,
+    starred: r.is_starred,
+    createdAt: r.created_at.toISOString(),
+    updatedAt: r.updated_at.toISOString(),
+    bucket: r.bucket,
+  };
+}
 
 function groupRows(rows: RawFileRow[]): FileBucket[] {
   const map = new Map<string, FileListEntry[]>();
@@ -124,21 +159,7 @@ function groupRows(rows: RawFileRow[]): FileBucket[] {
       map.set(r.bucket, []);
       order.push(r.bucket);
     }
-    map.get(r.bucket)!.push({
-      id: r.id,
-      ownerId: r.owner_id,
-      displayName: r.display_name,
-      mimeType: r.mime_type,
-      size: r.size.toString(),
-      visibility: r.visibility,
-      folderPath: r.folder_path,
-      guestAccess: r.guest_access,
-      isReadOnly: r.is_read_only,
-      isMentionRestricted: r.is_mention_restricted,
-      createdAt: r.created_at.toISOString(),
-      updatedAt: r.updated_at.toISOString(),
-      bucket: r.bucket,
-    });
+    map.get(r.bucket)!.push(toEntry(r));
   }
 
   return order.map((key) => ({
@@ -166,21 +187,34 @@ export async function listFilesGrouped(
   user: { id: string; role: string } | null,
   options: ListOptions = {},
 ): Promise<FileBucket[]> {
-  const { pageSize = 50, offset = 0 } = options;
+  const { pageSize = 50, offset = 0, sort = "date" } = options;
   const folderFilter = options.folderPath != null
     ? Prisma.sql`AND f."folderPath" = ${options.folderPath}`
     : Prisma.sql``;
 
-  // ── Unauthenticated: public + guest-enabled only ──────────────────────────
+  const dir = options.dir ?? (sort === "name" ? "asc" : "desc");
+  const direction = dir === "asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+  const orderBy =
+    sort === "name"
+      ? Prisma.sql`ORDER BY lower(f."displayName") ${direction}, f.id`
+      : sort === "size"
+        ? Prisma.sql`ORDER BY f.size ${direction}, f.id`
+        : Prisma.sql`ORDER BY f."createdAt" ${direction}, f.id`;
+
   const rows = await db.$queryRaw<RawFileRow[]>`
-    SELECT ${SELECT_COLS}
+    SELECT ${selectCols(user?.id ?? null)}
     FROM "file" f
     WHERE ${accessibleFilesSql(user)}
       ${folderFilter}
-    ORDER BY f."createdAt" DESC
+    ${orderBy}
     LIMIT ${pageSize} OFFSET ${offset}
   `;
-  return groupRows(rows);
+
+  if (sort === "date") return groupRows(rows);
+  // Name/size sorts read better as one flat list than as date buckets.
+  return rows.length === 0
+    ? []
+    : [{ key: "all", label: sort === "name" ? "By name" : "By size", files: rows.map(toEntry) }];
 }
 
 // ─── Recycle bin (user-scoped soft-deleted files) ─────────────────────────────
@@ -310,3 +344,55 @@ export async function listSubfolders(
   return getImmediateSubfolders(currentPath, allPaths);
 }
 
+
+/** Starred files the user can still read, most recently starred first. */
+export async function listStarredFiles(user: { id: string; role: string }): Promise<FileBucket[]> {
+  const rows = await db.$queryRaw<RawFileRow[]>`
+    SELECT ${selectCols(user.id)}
+    FROM "file" f
+    JOIN file_star s ON s."fileId" = f.id AND s."userId" = ${user.id}
+    WHERE ${accessibleFilesSql(user)}
+    ORDER BY s."createdAt" DESC
+    LIMIT 500
+  `;
+  return rows.length === 0 ? [] : [{ key: "starred", label: "Starred", files: rows.map(toEntry) }];
+}
+
+/** Audit actions that count as "working on" a file for the Recent view. */
+const RECENT_ACTIONS = [
+  "file.upload",
+  "file.download",
+  "file.replace",
+  "file.rename",
+  "file.move",
+  "file.version_restore",
+  "note.save",
+  "tag.add",
+];
+
+/**
+ * Files the user recently uploaded, opened or edited (from the audit trail),
+ * newest activity first, limited to files they can still read.
+ */
+export async function listRecentFiles(user: { id: string; role: string }): Promise<FileBucket[]> {
+  const rows = await db.$queryRaw<RawFileRow[]>`
+    WITH recent AS (
+      SELECT a."targetId" AS file_id, MAX(a."createdAt") AS last_at
+      FROM audit_log a
+      WHERE a."actorId" = ${user.id}
+        AND a."targetType" = 'file'
+        AND a.action = ANY(${RECENT_ACTIONS}::text[])
+        AND a."createdAt" > NOW() - INTERVAL '30 days'
+      GROUP BY a."targetId"
+      ORDER BY last_at DESC
+      LIMIT 200
+    )
+    SELECT ${selectCols(user.id)}
+    FROM recent r
+    JOIN "file" f ON f.id = r.file_id
+    WHERE ${accessibleFilesSql(user)}
+    ORDER BY r.last_at DESC
+    LIMIT 100
+  `;
+  return rows.length === 0 ? [] : [{ key: "recent", label: "Recent", files: rows.map(toEntry) }];
+}

@@ -77,7 +77,7 @@ export default async function FileDetailPage({ params }: PageProps) {
   };
 
   // 3. Fetch related details concurrently
-  const [tags, mentions, folderPaths, ownerRecord] = await Promise.all([
+  const [tags, mentions, folderPaths, ownerRecord, star] = await Promise.all([
     db.fileTag.findMany({
       where: { fileId: id },
       include: { tag: true },
@@ -103,6 +103,10 @@ export default async function FileDetailPage({ params }: PageProps) {
           select: { name: true },
         })
       : null,
+    db.fileStar.findUnique({
+      where: { userId_fileId: { userId: user.id, fileId: id } },
+      select: { fileId: true },
+    }),
   ]);
 
   const ownerName = ownerRecord?.name ?? "Unowned";
@@ -177,6 +181,7 @@ export default async function FileDetailPage({ params }: PageProps) {
       permissionLevel={level}
       initialDerivatives={serializedDerivatives}
       initialParentFile={serializedParentFile}
+      initialStarred={!!star}
     />
   );
 }

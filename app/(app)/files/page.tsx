@@ -6,9 +6,11 @@ import {
   listFilesGrouped,
   listSubfolders,
   listUserFolderPaths,
+  type FileSort,
 } from "@/lib/file-list";
 import { FileList } from "@/components/file-list";
 import { FolderToolbar } from "@/components/folder-toolbar";
+import { SortSelect } from "@/components/sort-select";
 import { getFolderAccess } from "@/lib/folders";
 import { normalizeFolderPath } from "@/lib/paths";
 import type { Role } from "@prisma/client";
@@ -33,6 +35,8 @@ interface PageProps {
     folderPath?: string;
     page?: string;
     pageSize?: string;
+    sort?: string;
+    dir?: string;
   }>;
 }
 
@@ -45,6 +49,14 @@ export default async function FilesPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const folderPath = normalizeFolderPath(params.folderPath ?? "/") ?? "/";
   const { page = "1", pageSize = "50" } = params;
+  const sort: FileSort =
+    params.sort === "name" || params.sort === "size" ? params.sort : "date";
+  const dir: "asc" | "desc" =
+    params.dir === "asc" || params.dir === "desc"
+      ? params.dir
+      : sort === "name"
+        ? "asc"
+        : "desc";
 
   const currentPage = Math.max(1, parseInt(page, 10));
   const limit = Math.min(200, Math.max(1, parseInt(pageSize, 10)));
@@ -54,7 +66,7 @@ export default async function FilesPage({ searchParams }: PageProps) {
 
   // Fetch data concurrently
   const [buckets, subfolders, folderPaths, folderAccess] = await Promise.all([
-    listFilesGrouped(user, { folderPath, pageSize: limit, offset }),
+    listFilesGrouped(user, { folderPath, pageSize: limit, offset, sort, dir }),
     listSubfolders(user, folderPath),
     listUserFolderPaths(user),
     getFolderAccess({ id: user.id, role: user.role as Role }, folderPath),
@@ -73,7 +85,7 @@ export default async function FilesPage({ searchParams }: PageProps) {
   const hasNextPage = totalFetched === limit;
 
   const getPaginationUrl = (pageNumber: number) => {
-    return `/files?folderPath=${encodeURIComponent(folderPath)}&page=${pageNumber}&pageSize=${limit}`;
+    return `/files?folderPath=${encodeURIComponent(folderPath)}&page=${pageNumber}&pageSize=${limit}&sort=${sort}&dir=${dir}`;
   };
 
   return (
@@ -107,6 +119,8 @@ export default async function FilesPage({ searchParams }: PageProps) {
             </BreadcrumbList>
           </Breadcrumb>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        <SortSelect sort={sort} dir={dir} />
         <FolderToolbar
           currentFolderPath={folderPath}
           folderPaths={folderPaths}
@@ -115,6 +129,7 @@ export default async function FilesPage({ searchParams }: PageProps) {
           ownerName={folderAccess.ownerName}
           isOwner={folderAccess.ownerId === user.id}
         />
+        </div>
       </div>
 
       {/* File List Grid & Tables */}

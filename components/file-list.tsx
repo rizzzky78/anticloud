@@ -48,6 +48,8 @@ interface FileListProps {
   userRole?: string;
   currentFolderPath?: string;
   files?: any[];
+  /** Header label override (e.g. "Starred"); defaults to the folder name. */
+  title?: string;
 }
 
 export function FileList({
@@ -58,6 +60,7 @@ export function FileList({
   userRole = "",
   currentFolderPath = "",
   files,
+  title,
 }: FileListProps) {
   const router = useRouter();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -264,9 +267,10 @@ export function FileList({
       <div className="flex items-center justify-between pb-3">
         <div className="text-sm font-medium text-muted-foreground">
           <span>
-            {currentFolderPath === "/"
-              ? "My Drive"
-              : getFolderName(currentFolderPath)}
+            {title ??
+              (currentFolderPath === "/"
+                ? "My Drive"
+                : getFolderName(currentFolderPath))}
           </span>
         </div>
         <div className="flex items-center gap-2 py-2 px-2 bg-muted rounded-full">

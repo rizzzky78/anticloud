@@ -15,8 +15,8 @@ export const runtime = "nodejs";
 // 2 GiB hard cap per request.
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 
-// Stricter than general API: 20 uploads / minute per user.
-const UPLOAD_RATE_MAX = 20;
+// Per-user upload rate limit; sized for folder uploads of many small files.
+const UPLOAD_RATE_MAX = 300;
 const UPLOAD_RATE_WINDOW = 60;
 
 const metaSchema = z.object({

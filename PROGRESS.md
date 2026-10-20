@@ -53,6 +53,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P16 — Folders as entities
 - [x] 16.1 schema · 16.2 inherited access · 16.3 folder operations · 16.4 folder sharing · 16.5 UI
 
+## P17 — Personal views & browser UX
+- [x] 17.1 starred · 17.2 recent · 17.3 sorting · 17.4 folder upload · 17.5 navigation
+
 ---
 
 # UI Progress

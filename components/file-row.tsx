@@ -53,6 +53,7 @@ import { MoveDialog } from "@/components/move-dialog";
 import { VisibilityDialog } from "@/components/visibility-dialog";
 import { ReplaceFileDialog } from "@/components/replace-file-dialog";
 import { FileShareDialog } from "@/components/file-share-dialog";
+import { StarButton } from "@/components/star-button";
 import { softDeleteFile } from "@/actions/file-config";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -299,6 +300,16 @@ export function FileRow({
               {formatBytes(file.size)} • <RelativeDate iso={file.createdAt} />
             </span>
           </div>
+          {file.starred !== undefined && (
+            <StarButton
+              fileId={file.id}
+              initialStarred={file.starred}
+              className={cn(
+                "ml-auto shrink-0",
+                !file.starred && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+              )}
+            />
+          )}
         </div>
       </TableCell>
       <TableCell
