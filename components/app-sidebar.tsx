@@ -33,6 +33,7 @@ import {
   UploadIcon,
   FileBraces,
   Share2Icon,
+  UsersRoundIcon,
 } from "lucide-react";
 
 interface AppSidebarUser {
@@ -73,6 +74,7 @@ export function AppSidebar({
   const navMain = [
     { title: "Files", url: "/files", icon: <FolderIcon /> },
     { title: "Shared", url: "/shared", icon: <Share2Icon /> },
+    { title: "Groups", url: "/groups", icon: <UsersRoundIcon /> },
     { title: "Search", url: "/search", icon: <SearchIcon /> },
     { title: "Notifications", url: "/notifications", icon: <BellIcon /> },
     { title: "Recycle Bin", url: "/trash", icon: <Trash2Icon /> },

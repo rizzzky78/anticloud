@@ -9,6 +9,7 @@ import {
 import { searchUsers } from "@/actions/users";
 import { canManage } from "@/lib/ui-access";
 import { ShareLinksPanel } from "@/components/share-links-panel";
+import { GroupSharesPanel } from "@/components/group-shares-panel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -626,6 +627,9 @@ export function FileSharingPanel({
           </div>
         )}
       </div>
+
+      {/* Group shares */}
+      <GroupSharesPanel fileId={fileId} canManage={userCanManage} onChanged={onSuccess} />
 
       {/* Public share links (managers only; not for mention-restricted files) */}
       {userCanManage && !file.isMentionRestricted && <ShareLinksPanel fileId={fileId} />}

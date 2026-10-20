@@ -38,7 +38,8 @@ type UserWithRole = Pick<User, "id" | "role">;
  *   1. SUPERADMIN bypass.
  *   2. Owner → ADMIN.
  *   3. Unowned file + global ADMIN → ADMIN (orphan management).
- *   4. Explicit per-file grant (VIEWER / EDITOR / ADMIN). Grants let a file
+ *   4. Explicit per-file grant (VIEWER / EDITOR / ADMIN) — direct or via a
+ *      group the user belongs to (highest wins). Grants let a file
  *      owner share beyond the recipient's system role, except that system
  *      GUESTs stay read-only and no grant confers SUPERADMIN.
  *   5. Mention-restriction gate (applies only to visibility-derived access).
@@ -106,15 +107,32 @@ export async function getCachedAccess(
   let ttl = PERM_TTL_SECONDS;
 
   if (user && user.role !== "SUPERADMIN" && file.ownerId !== user.id) {
-    const perm = await db.filePermission.findUnique({
-      where: { fileId_userId: { fileId, userId: user.id } },
-      select: { role: true, expiresAt: true },
-    });
-    if (perm && (!perm.expiresAt || perm.expiresAt.getTime() > Date.now())) {
-      explicitGrantLevel = perm.role;
+    const now = new Date();
+    const [perm, groupGrants] = await Promise.all([
+      db.filePermission.findUnique({
+        where: { fileId_userId: { fileId, userId: user.id } },
+        select: { role: true, expiresAt: true },
+      }),
+      db.fileGroupPermission.findMany({
+        where: {
+          fileId,
+          group: { members: { some: { userId: user.id } } },
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        select: { role: true, expiresAt: true },
+      }),
+    ]);
+
+    // Highest of the direct grant and every group grant the user inherits.
+    const grants = [
+      ...(perm && (!perm.expiresAt || perm.expiresAt > now) ? [perm] : []),
+      ...groupGrants,
+    ];
+    for (const grant of grants) {
+      explicitGrantLevel = maxLevel(explicitGrantLevel, grant.role);
       // Never cache a time-limited grant past its expiry.
-      if (perm.expiresAt) {
-        const remaining = Math.ceil((perm.expiresAt.getTime() - Date.now()) / 1000);
+      if (grant.expiresAt) {
+        const remaining = Math.ceil((grant.expiresAt.getTime() - now.getTime()) / 1000);
         ttl = Math.max(1, Math.min(ttl, remaining));
       }
     }
@@ -209,6 +227,12 @@ export function accessibleFilesSql(user: ListUser): Prisma.Sql {
       WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
         AND (fp."expiresAt" IS NULL OR fp."expiresAt" > NOW())
     )
+    OR EXISTS (
+      SELECT 1 FROM file_group_permission fgp
+      JOIN group_member gm ON gm."groupId" = fgp."groupId"
+      WHERE fgp."fileId" = f.id AND gm."userId" = ${user.id}
+        AND (fgp."expiresAt" IS NULL OR fgp."expiresAt" > NOW())
+    )
     OR (
       f.visibility = 'PUBLIC'
       AND (
@@ -242,6 +266,14 @@ export function accessibleFilesWhere(user: ListUser): Prisma.FileWhereInput {
       permissions: {
         some: {
           userId: user.id,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      },
+    },
+    {
+      groupPermissions: {
+        some: {
+          group: { members: { some: { userId: user.id } } },
           OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         },
       },

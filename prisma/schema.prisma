@@ -90,6 +90,9 @@ model User {
   auditLogs       AuditLog[]       @relation("AuditActor")
   versionsUploaded FileVersion[]   @relation("VersionUploader")
   shareLinks       ShareLink[]     @relation("ShareLinkCreator")
+  groupMemberships GroupMember[]
+  groupsCreated    Group[]         @relation("GroupCreator")
+  groupGrantsGiven FileGroupPermission[] @relation("GroupPermissionGrantedBy")
 
   @@index([role])
   @@map("user")
@@ -210,6 +213,7 @@ model File {
   notifications Notification[]
   versions      FileVersion[]
   shareLinks    ShareLink[]
+  groupPermissions FileGroupPermission[]
 
   @@index([ownerId])
   @@index([createdAt])
@@ -270,6 +274,64 @@ model FilePermission {
   @@unique([fileId, userId])
   @@index([userId])
   @@map("file_permission")
+}
+
+/// A named set of users (team / department) that files can be shared with
+/// as a unit (plan/phase-15).
+model Group {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+
+  createdById String?
+  createdBy   User?   @relation("GroupCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  members     GroupMember[]
+  permissions FileGroupPermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("group")
+}
+
+/// Group membership. `isManager` members may manage the member list.
+model GroupMember {
+  id      String @id @default(cuid())
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  isManager Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@map("group_member")
+}
+
+/// File shared with a whole group (plan/phase-15). Members receive the
+/// highest of their direct and group grants.
+model FileGroupPermission {
+  id      String @id @default(cuid())
+  fileId  String
+  file    File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  groupId String
+  group   Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role    Role
+
+  grantedById String?
+  grantedBy   User?   @relation("GroupPermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([fileId, groupId])
+  @@index([groupId])
+  @@map("file_group_permission")
 }
 
 /// Public share link (plan/phase-14): anyone holding the token can view and

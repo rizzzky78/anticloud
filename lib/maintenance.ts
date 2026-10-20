@@ -46,13 +46,16 @@ export async function expireFiles(now = new Date()): Promise<number> {
 /** Drop time-limited grants past their expiry, and long-dead share links. */
 export async function cleanupShares(now = new Date()): Promise<number> {
   const grants = await db.filePermission.deleteMany({ where: { expiresAt: { lte: now } } });
+  const groupGrants = await db.fileGroupPermission.deleteMany({
+    where: { expiresAt: { lte: now } },
+  });
   const cutoff = new Date(now.getTime() - TRASH_RETENTION_MS);
   const links = await db.shareLink.deleteMany({
     where: {
       OR: [{ revokedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }],
     },
   });
-  return grants.count + links.count;
+  return grants.count + groupGrants.count + links.count;
 }
 
 /** Hard-delete recycle-bin entries older than the retention window. */

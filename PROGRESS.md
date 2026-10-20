@@ -47,6 +47,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P14 — Sharing v2
 - [x] 14.1 share tiers · 14.2 expiring grants + notify · 14.3 shared views · 14.4 share links · 14.5 UI
 
+## P15 — Groups
+- [x] 15.1 schema · 15.2 resolver · 15.3 group management · 15.4 group sharing
+
 ---
 
 # UI Progress

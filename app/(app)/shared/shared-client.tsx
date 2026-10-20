@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Link2, LogOut, Search, Users } from "lucide-react";
+import { Link2, LogOut, Search, Users, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,11 @@ export function SharedClient({ withMe, byMe }: SharedClientProps) {
                           <Badge variant="secondary" className="text-[10px]">
                             {ROLE_LABEL[f.role] ?? f.role}
                           </Badge>
+                          {f.viaGroup && (
+                            <Badge variant="outline" className="gap-1 text-[10px]">
+                              <Users className="size-3" /> {f.viaGroup}
+                            </Badge>
+                          )}
                           {f.expiresAt && (
                             <Badge variant="outline" className="text-[10px]">
                               until {formatDate(f.expiresAt)}
@@ -147,6 +152,7 @@ export function SharedClient({ withMe, byMe }: SharedClientProps) {
                         {formatRelativeDate(f.sharedAt)}
                       </TableCell>
                       <TableCell className="text-right">
+                        {!f.viaGroup && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -157,6 +163,7 @@ export function SharedClient({ withMe, byMe }: SharedClientProps) {
                         >
                           <LogOut className="size-4" />
                         </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -193,6 +200,11 @@ export function SharedClient({ withMe, byMe }: SharedClientProps) {
                           {f.people > 0 && (
                             <Badge variant="secondary" className="gap-1 text-[10px]">
                               <Users className="size-3" /> {plural(f.people, "person", "people")}
+                            </Badge>
+                          )}
+                          {f.groups > 0 && (
+                            <Badge variant="secondary" className="gap-1 text-[10px]">
+                              <UsersRound className="size-3" /> {plural(f.groups, "group", "groups")}
                             </Badge>
                           )}
                           {f.activeLinks > 0 && (
