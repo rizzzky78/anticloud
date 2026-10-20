@@ -53,3 +53,19 @@ export function assertNotReadOnly(
     throw AppError.readOnly("This file is read-only");
   }
 }
+
+/**
+ * Load a live file and verify the caller may change its CONTENT (upload a new
+ * version, restore a version): EDITOR level or higher.
+ */
+export async function assertEditAccess(user: AccessUser, fileId: string): Promise<File> {
+  const file = await db.file.findFirst({ where: { id: fileId, deletedAt: null } });
+  if (!file) throw AppError.notFound("File not found");
+
+  await requireAccess(
+    { id: user.id, role: (user.role ?? "GUEST") as Role },
+    fileId,
+    "EDITOR",
+  );
+  return file;
+}

@@ -22,13 +22,15 @@ export async function proxy(request: NextRequest) {
   const isMetrics = pathname === '/api/metrics';
   const isApiAuth = pathname.startsWith('/api/auth');
   const isAuthPage = pathname === '/sign-in' || pathname === '/sign-up';
+  // Public share-link landing pages need no session.
+  const isPublicPage = pathname.startsWith('/s/');
   const isApi = pathname.startsWith('/api/');
 
   if (!isNextAsset && !isMetrics && !isApiAuth) {
     redis.incr("metrics:http_requests_total").catch(() => {});
   }
 
-  if (!isApi && !isAuthPage && !isNextAsset && !getSessionCookie(request)) {
+  if (!isApi && !isAuthPage && !isPublicPage && !isNextAsset && !getSessionCookie(request)) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 

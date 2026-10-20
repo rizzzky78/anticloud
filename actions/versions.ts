@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { requireAccess } from "@/lib/permissions";
-import { assertNotReadOnly, assertWriteAccess } from "@/lib/file-access";
+import { assertEditAccess, assertNotReadOnly, assertWriteAccess } from "@/lib/file-access";
 import { recordAudit } from "@/lib/audit";
 import { invalidateUserSearchCache } from "@/lib/search";
 import {
@@ -29,7 +29,7 @@ export async function getFileVersions(payload: unknown): Promise<FileVersionEntr
   return listFileVersions(fileId);
 }
 
-async function loadVersionForWrite(versionId: string) {
+async function loadVersionForWrite(versionId: string, mode: "edit" | "manage") {
   const session = await getCurrentUser();
   if (!session) throw AppError.unauthorized();
 
@@ -39,18 +39,21 @@ async function loadVersionForWrite(versionId: string) {
   });
   if (!version) throw AppError.notFound("Version not found");
 
-  const file = await assertWriteAccess(session.user, version.fileId);
+  const file =
+    mode === "edit"
+      ? await assertEditAccess(session.user, version.fileId)
+      : await assertWriteAccess(session.user, version.fileId);
   assertNotReadOnly(file, session.user.role as string | undefined);
   return { session, version };
 }
 
 /**
- * Restore a historical version as the live content. The current content is
- * kept in history, so a restore can itself be undone.
+ * Restore a historical version as the live content (EDITOR+). The current
+ * content is kept in history, so a restore can itself be undone.
  */
 export async function restoreVersion(payload: unknown) {
   const { versionId } = versionIdSchema.parse(payload);
-  const { session, version } = await loadVersionForWrite(versionId);
+  const { session, version } = await loadVersionForWrite(versionId, "edit");
 
   const result = await restoreFileVersion(versionId, session.user.id);
   await invalidateUserSearchCache();
@@ -64,10 +67,10 @@ export async function restoreVersion(payload: unknown) {
   return result;
 }
 
-/** Permanently delete one historical version. */
+/** Permanently delete one historical version. Managers only. */
 export async function deleteVersion(payload: unknown) {
   const { versionId } = versionIdSchema.parse(payload);
-  const { session, version } = await loadVersionForWrite(versionId);
+  const { session, version } = await loadVersionForWrite(versionId, "manage");
 
   const result = await deleteFileVersion(versionId);
   await recordAudit({

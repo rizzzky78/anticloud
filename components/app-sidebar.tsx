@@ -32,6 +32,7 @@ import {
   CloudIcon,
   UploadIcon,
   FileBraces,
+  Share2Icon,
 } from "lucide-react";
 
 interface AppSidebarUser {
@@ -71,6 +72,7 @@ export function AppSidebar({
 
   const navMain = [
     { title: "Files", url: "/files", icon: <FolderIcon /> },
+    { title: "Shared", url: "/shared", icon: <Share2Icon /> },
     { title: "Search", url: "/search", icon: <SearchIcon /> },
     { title: "Notifications", url: "/notifications", icon: <BellIcon /> },
     { title: "Recycle Bin", url: "/trash", icon: <Trash2Icon /> },

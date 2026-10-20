@@ -43,6 +43,18 @@ export async function expireFiles(now = new Date()): Promise<number> {
   return count;
 }
 
+/** Drop time-limited grants past their expiry, and long-dead share links. */
+export async function cleanupShares(now = new Date()): Promise<number> {
+  const grants = await db.filePermission.deleteMany({ where: { expiresAt: { lte: now } } });
+  const cutoff = new Date(now.getTime() - TRASH_RETENTION_MS);
+  const links = await db.shareLink.deleteMany({
+    where: {
+      OR: [{ revokedAt: { lt: cutoff } }, { expiresAt: { lt: cutoff } }],
+    },
+  });
+  return grants.count + links.count;
+}
+
 /** Hard-delete recycle-bin entries older than the retention window. */
 export async function purgeTrash(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - TRASH_RETENTION_MS);
@@ -87,6 +99,7 @@ export interface MaintenanceReport {
   expired: number;
   purged: number;
   archivesRemoved: number;
+  sharesRemoved: number;
 }
 
 /**
@@ -96,7 +109,9 @@ export interface MaintenanceReport {
 export async function runMaintenance(): Promise<MaintenanceReport> {
   const token = randomUUID();
   const acquired = await redis.set(LOCK_KEY, token, "EX", LOCK_TTL_SECONDS, "NX");
-  if (!acquired) return { ran: false, expired: 0, purged: 0, archivesRemoved: 0 };
+  if (!acquired) {
+    return { ran: false, expired: 0, purged: 0, archivesRemoved: 0, sharesRemoved: 0 };
+  }
 
   try {
     const now = new Date();
@@ -106,8 +121,9 @@ export async function runMaintenance(): Promise<MaintenanceReport> {
       console.error("[maintenance] Archive cleanup failed:", err);
       return 0;
     });
-    if (expired > 0 || purged > 0) await invalidateUserSearchCache();
-    return { ran: true, expired, purged, archivesRemoved };
+    const sharesRemoved = await cleanupShares(now);
+    if (expired > 0 || purged > 0 || sharesRemoved > 0) await invalidateUserSearchCache();
+    return { ran: true, expired, purged, archivesRemoved, sharesRemoved };
   } finally {
     // Release only our own lock.
     if ((await redis.get(LOCK_KEY)) === token) await redis.del(LOCK_KEY);

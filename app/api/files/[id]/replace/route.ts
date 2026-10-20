@@ -50,7 +50,8 @@ export async function PUT(
 
     const userRole = session.user.role as Role;
     const level = await getCachedAccess({ id: session.user.id, role: userRole }, id);
-    if (!level || !hasMinimumLevel(level, "ADMIN")) {
+    // Editors (and above) may upload new content; the old binary stays in history.
+    if (!level || !hasMinimumLevel(level, "EDITOR")) {
       // Return 404 to avoid confirming file existence to unauthorized callers.
       return Response.json({ code: "NOT_FOUND", message: "Not found" }, { status: 404 });
     }

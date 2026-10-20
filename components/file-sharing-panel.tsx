@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { Role } from "@prisma/client";
 import {
   getFilePermissions,
   grantFileRole,
@@ -9,6 +8,7 @@ import {
 } from "@/actions/roles";
 import { searchUsers } from "@/actions/users";
 import { canManage } from "@/lib/ui-access";
+import { ShareLinksPanel } from "@/components/share-links-panel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,11 +67,33 @@ interface ShareGrantUser {
   role: string;
 }
 
+/** Share tiers offered to managers (ADMIN = "Manager"). */
+type ShareRole = "VIEWER" | "EDITOR" | "ADMIN";
+
+const SHARE_ROLES: { value: ShareRole; label: string; description: string }[] = [
+  { value: "VIEWER", label: "Viewer", description: "View and download" },
+  { value: "EDITOR", label: "Editor", description: "Upload new versions, notes and tags" },
+  { value: "ADMIN", label: "Manager", description: "Full control, including sharing" },
+];
+
+function roleLabel(role: string): string {
+  return SHARE_ROLES.find((r) => r.value === role)?.label ?? role.toLowerCase();
+}
+
+const GRANT_EXPIRY_OPTIONS = [
+  { value: "never", label: "No expiry" },
+  { value: "1", label: "1 day" },
+  { value: "7", label: "7 days" },
+  { value: "30", label: "30 days" },
+  { value: "90", label: "90 days" },
+];
+
 interface SharePermission {
   id: string;
   fileId: string;
   userId: string;
-  role: Role;
+  role: string;
+  expiresAt: Date | string | null;
   user: ShareGrantUser;
   grantedBy: {
     id: string;
@@ -94,6 +116,8 @@ interface FileSharingPanelProps {
   >;
   currentUserRole: string;
   currentUserId: string;
+  /** Server-resolved manage right; falls back to the display-only heuristic. */
+  canManageSharing?: boolean;
   onOpenVisibility?: () => void;
   onOpenConfig?: () => void;
   onSuccess?: () => void;
@@ -104,6 +128,7 @@ export function FileSharingPanel({
   file,
   currentUserRole,
   currentUserId,
+  canManageSharing,
   onOpenVisibility,
   onOpenConfig,
   onSuccess,
@@ -119,7 +144,8 @@ export function FileSharingPanel({
   );
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ShareGrantUser | null>(null);
-  const [selectedRole, setSelectedRole] = useState<Role>("VIEWER");
+  const [selectedRole, setSelectedRole] = useState<ShareRole>("VIEWER");
+  const [selectedExpiry, setSelectedExpiry] = useState("never");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Revoke state
@@ -127,7 +153,9 @@ export function FileSharingPanel({
     null,
   );
 
-  const userCanManage = canManage(file, currentUserId, currentUserRole);
+  // Sharing is an access-control setting, so a read-only lock does not block it.
+  const userCanManage =
+    canManageSharing ?? canManage({ ...file, isReadOnly: false }, currentUserId, currentUserRole);
 
   // Fetch permissions
   const fetchPermissions = async () => {
@@ -184,9 +212,15 @@ export function FileSharingPanel({
           fileId,
           targetUserId: selectedUser.id,
           role: selectedRole,
+          expiresAt:
+            selectedExpiry === "never"
+              ? null
+              : new Date(
+                  Date.now() + Number(selectedExpiry) * 24 * 60 * 60 * 1000,
+                ).toISOString(),
         });
         toast.success(
-          `Granted ${selectedRole.toLowerCase()} access to ${selectedUser.name}`,
+          `Shared with ${selectedUser.name} as ${roleLabel(selectedRole)}`,
         );
         setSelectedUser(null);
         setUserQuery("");
@@ -195,6 +229,25 @@ export function FileSharingPanel({
         if (onSuccess) onSuccess();
       } catch (err: any) {
         toast.error(err?.message || "Failed to grant permission");
+      }
+    });
+  };
+
+  const handleChangeRole = (grant: SharePermission, role: ShareRole) => {
+    if (grant.role === role) return;
+    startTransition(async () => {
+      try {
+        await grantFileRole({
+          fileId,
+          targetUserId: grant.userId,
+          role,
+          expiresAt: grant.expiresAt ? new Date(grant.expiresAt).toISOString() : null,
+        });
+        toast.success(`${grant.user.name} is now ${roleLabel(role)}`);
+        fetchPermissions();
+        if (onSuccess) onSuccess();
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to update access");
       }
     });
   };
@@ -226,17 +279,6 @@ export function FileSharingPanel({
       .join("")
       .toUpperCase();
   };
-
-  // Enforce downward-only rule in UI.
-  // Superadmin can grant anything. Admin can grant ADMIN, VIEWER, GUEST. Viewer/Guest cannot grant.
-  const getAvailableRoles = (): Role[] => {
-    if (currentUserRole === "SUPERADMIN") {
-      return ["SUPERADMIN", "ADMIN", "VIEWER", "GUEST"];
-    }
-    return ["ADMIN", "VIEWER", "GUEST"];
-  };
-
-  const availableRoles = getAvailableRoles();
 
   return (
     <div className="space-y-6">
@@ -406,19 +448,39 @@ export function FileSharingPanel({
             </div>
 
             {/* Role select */}
-            <div className="w-full md:w-48">
+            <div className="w-full md:w-36">
               <Select
                 value={selectedRole}
-                onValueChange={(val: Role) => setSelectedRole(val)}
+                onValueChange={(val: ShareRole) => setSelectedRole(val)}
                 disabled={isPending}
               >
-                <SelectTrigger className="w-full h-10 border-b-input capitalize">
+                <SelectTrigger className="w-full h-10 border-b-input">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableRoles.map((role) => (
-                    <SelectItem key={role} value={role} className="capitalize">
-                      {role.toLowerCase()}
+                  {SHARE_ROLES.map((role) => (
+                    <SelectItem key={role.value} value={role.value}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Expiry select */}
+            <div className="w-full md:w-32">
+              <Select
+                value={selectedExpiry}
+                onValueChange={setSelectedExpiry}
+                disabled={isPending}
+              >
+                <SelectTrigger className="w-full h-10 border-b-input">
+                  <SelectValue placeholder="Expiry" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRANT_EXPIRY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -436,13 +498,15 @@ export function FileSharingPanel({
               ) : (
                 <UserPlus className="size-4 mr-2" />
               )}
-              Grant Access
+              Share
             </Button>
           </div>
           {selectedUser && (
             <p className="text-[10px] text-muted-foreground">
-              Granting <strong>{selectedRole}</strong> access to{" "}
-              {selectedUser.name} ({selectedUser.email})
+              Sharing with {selectedUser.name} as{" "}
+              <strong>{roleLabel(selectedRole)}</strong> (
+              {SHARE_ROLES.find((r) => r.value === selectedRole)?.description}).
+              They will be notified.
             </p>
           )}
         </div>
@@ -497,12 +561,19 @@ export function FileSharingPanel({
                           <span className="text-xs font-semibold text-foreground truncate max-w-[150px] sm:max-w-xs">
                             {grantUser.name}
                           </span>
-                          <Badge
-                            variant="outline"
-                            className="text-[9px] px-1.5 py-0.5 border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50"
-                          >
-                            {grant.role}
-                          </Badge>
+                          {!userCanManage && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9px] px-1.5 py-0.5 border-zinc-200 text-zinc-700 bg-zinc-50 dark:border-zinc-800 dark:text-zinc-300 dark:bg-zinc-900/50"
+                            >
+                              {roleLabel(grant.role)}
+                            </Badge>
+                          )}
+                          {grant.expiresAt && (
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0.5">
+                              until {new Date(grant.expiresAt).toLocaleDateString()}
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-[10px] text-muted-foreground truncate">
                           {grantUser.username
@@ -517,8 +588,25 @@ export function FileSharingPanel({
                       </div>
                     </div>
 
-                    {/* Revoke button (Owner & Admin only) */}
+                    {/* Level select + revoke (managers only) */}
                     {userCanManage && (
+                      <div className="flex items-center gap-1 shrink-0">
+                      <Select
+                        value={grant.role}
+                        onValueChange={(val: ShareRole) => handleChangeRole(grant, val)}
+                        disabled={isPending}
+                      >
+                        <SelectTrigger className="h-8 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SHARE_ROLES.map((role) => (
+                            <SelectItem key={role.value} value={role.value} className="text-xs">
+                              {role.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -529,6 +617,7 @@ export function FileSharingPanel({
                       >
                         <Trash2 className="size-4" />
                       </Button>
+                      </div>
                     )}
                   </div>
                 );
@@ -537,6 +626,9 @@ export function FileSharingPanel({
           </div>
         )}
       </div>
+
+      {/* Public share links (managers only; not for mention-restricted files) */}
+      {userCanManage && !file.isMentionRestricted && <ShareLinksPanel fileId={fileId} />}
 
       {/* Revoke confirmation Dialog */}
       <AlertDialog
@@ -548,7 +640,7 @@ export function FileSharingPanel({
             <AlertDialogTitle>Revoke file access?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to revoke{" "}
-              <strong>{revokeTarget?.role}</strong> access for{" "}
+              <strong>{revokeTarget ? roleLabel(revokeTarget.role) : ""}</strong> access for{" "}
               <strong>{revokeTarget?.user.name}</strong>? They will lose
               explicit permission to view, download, or edit this file.
             </AlertDialogDescription>

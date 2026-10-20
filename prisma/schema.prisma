@@ -20,9 +20,12 @@ datasource db {
 
 /// System- and file-level access tiers. Resolution order lives in
 /// `lib/permissions.ts` (see plan/phase-02-rbac.md).
+/// `EDITOR` is file-level only (plan/phase-14): read + upload new versions +
+/// notes/tags, without manage rights. It is never assigned as a system role.
 enum Role {
   SUPERADMIN
   ADMIN
+  EDITOR
   VIEWER
   GUEST
 }
@@ -86,6 +89,7 @@ model User {
   notifications   Notification[]
   auditLogs       AuditLog[]       @relation("AuditActor")
   versionsUploaded FileVersion[]   @relation("VersionUploader")
+  shareLinks       ShareLink[]     @relation("ShareLinkCreator")
 
   @@index([role])
   @@map("user")
@@ -205,6 +209,7 @@ model File {
   notes         FileNote[]
   notifications Notification[]
   versions      FileVersion[]
+  shareLinks    ShareLink[]
 
   @@index([ownerId])
   @@index([createdAt])
@@ -255,12 +260,42 @@ model FilePermission {
   grantedById String?
   grantedBy   User?   @relation("PermissionGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
 
+  // Optional time-limited share (plan/phase-14). Expired grants are ignored by
+  // the resolver and removed by the maintenance pass.
+  expiresAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([fileId, userId])
   @@index([userId])
   @@map("file_permission")
+}
+
+/// Public share link (plan/phase-14): anyone holding the token can view and
+/// download one file, subject to optional expiry, password, and download cap.
+model ShareLink {
+  id     String @id @default(cuid())
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  token String  @unique
+  label String?
+
+  createdById String?
+  createdBy   User?   @relation("ShareLinkCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  expiresAt     DateTime?
+  passwordHash  String?
+  maxDownloads  Int?
+  downloadCount Int       @default(0)
+  revokedAt     DateTime?
+  lastAccessAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([fileId])
+  @@map("share_link")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

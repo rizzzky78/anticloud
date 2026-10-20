@@ -6,8 +6,9 @@ import { db } from "@/lib/db";
 export type AccessLevel = Role;
 
 const RolePriority: Record<Role, number> = {
-  SUPERADMIN: 4,
-  ADMIN: 3,
+  SUPERADMIN: 5,
+  ADMIN: 4,
+  EDITOR: 3,
   VIEWER: 2,
   GUEST: 1,
 };
@@ -37,7 +38,9 @@ type UserWithRole = Pick<User, "id" | "role">;
  *   1. SUPERADMIN bypass.
  *   2. Owner → ADMIN.
  *   3. Unowned file + global ADMIN → ADMIN (orphan management).
- *   4. Explicit per-file grant, clamped to the user's system role.
+ *   4. Explicit per-file grant (VIEWER / EDITOR / ADMIN). Grants let a file
+ *      owner share beyond the recipient's system role, except that system
+ *      GUESTs stay read-only and no grant confers SUPERADMIN.
  *   5. Mention-restriction gate (applies only to visibility-derived access).
  *   6. PUBLIC visibility: global ADMIN → ADMIN (moderation), user → VIEWER,
  *      anonymous → GUEST when guest access is enabled.
@@ -55,10 +58,10 @@ export function resolveAccess(
 
   let grantLevel: AccessLevel | null = null;
   if (user && explicitGrantLevel) {
-    grantLevel =
-      RolePriority[explicitGrantLevel] > RolePriority[user.role]
-        ? user.role
-        : explicitGrantLevel;
+    grantLevel = explicitGrantLevel === "SUPERADMIN" ? "ADMIN" : explicitGrantLevel;
+    if (user.role === "GUEST" && RolePriority[grantLevel] > RolePriority.VIEWER) {
+      grantLevel = "VIEWER";
+    }
   }
 
   let visibilityLevel: AccessLevel | null = null;
@@ -100,13 +103,21 @@ export async function getCachedAccess(
 
   let explicitGrantLevel: Role | null = null;
   let isMentioned = false;
+  let ttl = PERM_TTL_SECONDS;
 
   if (user && user.role !== "SUPERADMIN" && file.ownerId !== user.id) {
     const perm = await db.filePermission.findUnique({
       where: { fileId_userId: { fileId, userId: user.id } },
-      select: { role: true },
+      select: { role: true, expiresAt: true },
     });
-    explicitGrantLevel = perm?.role ?? null;
+    if (perm && (!perm.expiresAt || perm.expiresAt.getTime() > Date.now())) {
+      explicitGrantLevel = perm.role;
+      // Never cache a time-limited grant past its expiry.
+      if (perm.expiresAt) {
+        const remaining = Math.ceil((perm.expiresAt.getTime() - Date.now()) / 1000);
+        ttl = Math.max(1, Math.min(ttl, remaining));
+      }
+    }
 
     if (file.isMentionRestricted) {
       const mention = await db.fileMention.findUnique({
@@ -118,7 +129,7 @@ export async function getCachedAccess(
   }
 
   const level = resolveAccess(user, file, explicitGrantLevel, isMentioned);
-  await redis.set(cacheKey, level ?? "NONE", "EX", PERM_TTL_SECONDS);
+  await redis.set(cacheKey, level ?? "NONE", "EX", ttl);
   return level;
 }
 
@@ -139,8 +150,8 @@ export async function requireAccess(
 
 /**
  * Whether a user may contribute collaborative content (notes, tags) to a file.
- * Plain visibility-derived VIEWER access is NOT enough: only managers (ADMIN+),
- * users holding an explicit grant, and mentioned users may contribute.
+ * Plain visibility-derived VIEWER access is NOT enough: only EDITOR+ (editors,
+ * managers, owners) and mentioned users may contribute.
  */
 export async function requireContributor(
   user: UserWithRole,
@@ -148,19 +159,13 @@ export async function requireContributor(
 ): Promise<AccessLevel> {
   const level = await getCachedAccess(user, fileId);
   if (!level) throw AppError.forbidden();
-  if (hasMinimumLevel(level, "ADMIN")) return level;
+  if (hasMinimumLevel(level, "EDITOR")) return level;
 
-  const [grant, mention] = await Promise.all([
-    db.filePermission.findUnique({
-      where: { fileId_userId: { fileId, userId: user.id } },
-      select: { id: true },
-    }),
-    db.fileMention.findUnique({
-      where: { fileId_mentionedUserId: { fileId, mentionedUserId: user.id } },
-      select: { id: true },
-    }),
-  ]);
-  if (!grant && !mention) {
+  const mention = await db.fileMention.findUnique({
+    where: { fileId_mentionedUserId: { fileId, mentionedUserId: user.id } },
+    select: { id: true },
+  });
+  if (!mention) {
     throw AppError.forbidden("Only collaborators can contribute to this file");
   }
   return level;
@@ -199,7 +204,11 @@ export function accessibleFilesSql(user: ListUser): Prisma.Sql {
   return Prisma.sql`${live} AND (
     f."ownerId" = ${user.id}
     ${unowned}
-    OR EXISTS (SELECT 1 FROM file_permission fp WHERE fp."fileId" = f.id AND fp."userId" = ${user.id})
+    OR EXISTS (
+      SELECT 1 FROM file_permission fp
+      WHERE fp."fileId" = f.id AND fp."userId" = ${user.id}
+        AND (fp."expiresAt" IS NULL OR fp."expiresAt" > NOW())
+    )
     OR (
       f.visibility = 'PUBLIC'
       AND (
@@ -229,7 +238,14 @@ export function accessibleFilesWhere(user: ListUser): Prisma.FileWhereInput {
 
   const scope: Prisma.FileWhereInput[] = [
     { ownerId: user.id },
-    { permissions: { some: { userId: user.id } } },
+    {
+      permissions: {
+        some: {
+          userId: user.id,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+      },
+    },
     {
       visibility: "PUBLIC",
       OR: [

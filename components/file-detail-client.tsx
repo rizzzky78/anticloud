@@ -147,8 +147,11 @@ export function FileDetailClient({
   const isMutateDisabled = file.isReadOnly && user.role !== "SUPERADMIN";
   // Manage rights come from the server-resolved level (owner, grant, or
   // moderating admin); a read-only lock still blocks non-admins.
-  const userCanManage =
-    (permissionLevel === "ADMIN" || permissionLevel === "SUPERADMIN") &&
+  const isManager = permissionLevel === "ADMIN" || permissionLevel === "SUPERADMIN";
+  const userCanManage = isManager && (!file.isReadOnly || isAdminOrAbove(user.role));
+  // Editors may upload new versions / restore history but not manage the file.
+  const userCanEdit =
+    (isManager || permissionLevel === "EDITOR") &&
     (!file.isReadOnly || isAdminOrAbove(user.role));
   const isSoftDeleted = !!file.deletedAt;
 
@@ -387,6 +390,13 @@ export function FileDetailClient({
               <Download className="size-4 mr-2" /> Download
             </a>
           </Button>
+
+          {/* Editors (non-managers) can upload a new version */}
+          {userCanEdit && !userCanManage && !isSoftDeleted && (
+            <Button variant="outline" onClick={() => setIsReplaceOpen(true)}>
+              <FileUp className="size-4 mr-2" /> Upload new version
+            </Button>
+          )}
 
           {/* Config Lifecycle settings button */}
           {userCanManage && !isSoftDeleted && (
@@ -791,6 +801,7 @@ export function FileDetailClient({
                     file={file}
                     currentUserRole={user.role}
                     currentUserId={user.id}
+                    canManageSharing={isManager && !isSoftDeleted}
                     onOpenVisibility={() => setIsVisibilityOpen(true)}
                     onOpenConfig={() => setIsConfigOpen(true)}
                     onSuccess={handleRefresh}
@@ -812,7 +823,8 @@ export function FileDetailClient({
                     currentVersion={file.version ?? 1}
                     currentSize={file.size}
                     currentUpdatedAt={file.contentUpdatedAt ?? file.updatedAt}
-                    canEdit={userCanManage && !isSoftDeleted}
+                    canEdit={userCanEdit && !isSoftDeleted}
+                    canDelete={userCanManage && !isSoftDeleted}
                     onChanged={handleRefresh}
                   />
                 </CardContent>
@@ -834,7 +846,7 @@ export function FileDetailClient({
                 fileId={file.id}
                 initialTags={initialTags}
                 isReadOnly={file.isReadOnly || isSoftDeleted}
-                canEdit={userCanManage}
+                canEdit={userCanEdit}
               />
               <FileMentions
                 fileId={file.id}
@@ -873,13 +885,6 @@ export function FileDetailClient({
             currentGuestAccess={file.guestAccess}
             onSuccess={handleRefresh}
           />
-          <ReplaceFileDialog
-            isOpen={isReplaceOpen}
-            onOpenChange={setIsReplaceOpen}
-            fileId={file.id}
-            fileName={file.displayName}
-            onSuccess={handleRefresh}
-          />
           <FileConfigPanel
             isOpen={isConfigOpen}
             onOpenChange={setIsConfigOpen}
@@ -915,6 +920,16 @@ export function FileDetailClient({
             </AlertDialogContent>
           </AlertDialog>
         </>
+      )}
+
+      {userCanEdit && !isSoftDeleted && (
+        <ReplaceFileDialog
+          isOpen={isReplaceOpen}
+          onOpenChange={setIsReplaceOpen}
+          fileId={file.id}
+          fileName={file.displayName}
+          onSuccess={handleRefresh}
+        />
       )}
 
       {/* Standalone History Dialog for Owner/Admin */}

@@ -24,8 +24,10 @@ interface FileVersionsPanelProps {
   currentVersion: number;
   currentSize: string;
   currentUpdatedAt: string;
-  /** Manager without a read-only lock: may restore/delete versions. */
+  /** Editor+ without a read-only lock: may restore versions. */
   canEdit: boolean;
+  /** Manager without a read-only lock: may delete versions. */
+  canDelete: boolean;
   onChanged: () => void;
 }
 
@@ -38,6 +40,7 @@ export function FileVersionsPanel({
   currentSize,
   currentUpdatedAt,
   canEdit,
+  canDelete,
   onChanged,
 }: FileVersionsPanelProps) {
   const [versions, setVersions] = useState<FileVersionEntry[] | null>(null);
@@ -129,7 +132,6 @@ export function FileVersionsPanel({
                   </a>
                 </Button>
                 {canEdit && (
-                  <>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -141,6 +143,8 @@ export function FileVersionsPanel({
                       <RotateCcw className="size-4" />
                       <span className="sr-only">Restore version {v.version}</span>
                     </Button>
+                )}
+                {canDelete && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -152,7 +156,6 @@ export function FileVersionsPanel({
                       <Trash2 className="size-4" />
                       <span className="sr-only">Delete version {v.version}</span>
                     </Button>
-                  </>
                 )}
               </div>
             </li>
