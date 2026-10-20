@@ -10,6 +10,9 @@ import type { Role } from "@prisma/client";
 
 export const runtime = "nodejs";
 
+/** Without a thumbnail, previews fall back to the original only below this size. */
+const PREVIEW_ORIGINAL_MAX_BYTES = 3 * 1024 * 1024;
+
 /**
  * Load a live (not soft-deleted, not expired) file and resolve read access via
  * the central permission resolver, so downloads honor exactly the same rules
@@ -104,6 +107,27 @@ export async function GET(
     // row, so they must not be audited (would flood the trail) and should be
     // browser-cacheable rather than revalidated on every scroll/back-nav.
     const isPreview = request.nextUrl.searchParams.get("preview") === "1";
+
+    // List previews: serve the generated thumbnail when there is one, and
+    // never stream a large original just to draw a 36px chip.
+    if (isPreview && file.mimeType.startsWith("image/")) {
+      if (file.thumbnailKey) {
+        const thumb = await getObjectStream(file.thumbnailKey).catch(() => null);
+        if (thumb) {
+          return new Response(Readable.toWeb(thumb) as ReadableStream, {
+            status: 200,
+            headers: {
+              "Content-Type": "image/webp",
+              "Content-Disposition": "inline",
+              "X-Content-Type-Options": "nosniff",
+              "Content-Security-Policy": "sandbox; default-src 'none'",
+              "Cache-Control": "private, max-age=300, stale-while-revalidate=600",
+            },
+          });
+        }
+      }
+      if (totalSize > PREVIEW_ORIGINAL_MAX_BYTES) return new Response(null, { status: 404 });
+    }
 
     // Record one audit entry per view. Media players issue many follow-up Range
     // requests while seeking; only the initial request (full body, or a range

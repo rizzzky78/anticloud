@@ -107,6 +107,13 @@ If your deployment relies on full-text search indexes, initialize them too:
 docker compose run --rm anticloud-worker bun run scripts/setup-fts.ts
 ```
 
+After upgrading an existing deployment, generate thumbnails for images that
+were uploaded before thumbnails existed (new uploads get one automatically):
+
+```bash
+docker compose run --rm anticloud-worker bun run scripts/backfill-thumbnails.ts
+```
+
 ---
 
 ## 6. Verify

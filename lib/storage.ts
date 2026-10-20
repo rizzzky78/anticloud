@@ -51,6 +51,7 @@ export const KeyPrefix = {
   file: "files",
   derived: "derived",
   archive: "archives",
+  thumbnail: "thumbs",
 } as const;
 
 export type KeyPrefix = (typeof KeyPrefix)[keyof typeof KeyPrefix];

@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import { AppError } from "@/lib/result";
 import { removeObjects } from "@/lib/storage";
 import { bustFileMeta } from "@/lib/file-meta";
+import { queueThumbnail } from "@/lib/thumbnails";
 
 /**
  * File version history (plan/phase-13).
@@ -22,6 +23,17 @@ export interface FileVersionEntry {
   uploadedBy: { id: string; name: string } | null;
   uploadedAt: string;
   supersededAt: string;
+}
+
+/** Drop the outdated thumbnail object and queue one for the new content. */
+async function afterContentChange(
+  oldThumbnailKey: string | null,
+  file: { id: string; mimeType: string; size: bigint },
+) {
+  if (oldThumbnailKey) await removeObjects([oldThumbnailKey]).catch(() => {});
+  await queueThumbnail(file).catch((err) =>
+    console.error(`[versions] Failed to queue thumbnail for ${file.id}:`, err),
+  );
 }
 
 /** Resolve a user id only if the account still exists (FK safety). */
@@ -59,6 +71,7 @@ export async function replaceFileContent(input: {
         version: file.version + 1,
         contentUploadedById: input.actorId,
         contentUpdatedAt: new Date(),
+        thumbnailKey: null,
       },
     });
     if (updated.count !== 1) {
@@ -87,6 +100,11 @@ export async function replaceFileContent(input: {
     );
   }
 
+  await afterContentChange(file.thumbnailKey, {
+    id: file.id,
+    mimeType: input.mimeType,
+    size: input.size,
+  });
   await bustFileMeta(file.id);
   await pruneVersions(file.id);
   return { version: nextVersion };
@@ -118,6 +136,7 @@ export async function restoreFileVersion(versionId: string, actorId: string) {
         version: file.version + 1,
         contentUploadedById: actorId,
         contentUpdatedAt: new Date(),
+        thumbnailKey: null,
       },
     });
     if (updated.count !== 1) {
@@ -137,6 +156,11 @@ export async function restoreFileVersion(versionId: string, actorId: string) {
     });
   });
 
+  await afterContentChange(file.thumbnailKey, {
+    id: file.id,
+    mimeType: target.mimeType,
+    size: target.size,
+  });
   await bustFileMeta(file.id);
   await pruneVersions(file.id);
   return { fileId: file.id, restoredVersion: target.version };

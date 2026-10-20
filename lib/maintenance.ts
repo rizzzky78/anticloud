@@ -23,12 +23,16 @@ const LOCK_TTL_SECONDS = 15 * 60;
 export async function hardDeleteFile(fileId: string): Promise<void> {
   const file = await db.file.findUnique({
     where: { id: fileId },
-    select: { id: true, objectKey: true },
+    select: { id: true, objectKey: true, thumbnailKey: true },
   });
   if (!file) return;
 
   const historyKeys = await versionObjectKeys(fileId);
-  await removeObjects([file.objectKey, ...historyKeys]);
+  await removeObjects([
+    file.objectKey,
+    ...historyKeys,
+    ...(file.thumbnailKey ? [file.thumbnailKey] : []),
+  ]);
   await db.file.delete({ where: { id: fileId } });
   await bustFileMeta(fileId);
   await invalidatePermCache(null, fileId);

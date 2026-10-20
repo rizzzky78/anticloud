@@ -122,6 +122,12 @@ async function main() {
         };
       }
 
+      case "THUMBNAIL": {
+        const { fileId } = job.payload as { fileId: string };
+        const { generateThumbnail } = await import("./lib/thumbnails");
+        return await generateThumbnail(fileId);
+      }
+
       case "TTL_EXPIRY": {
         const report = await runMaintenance();
         return { success: true, ...report };

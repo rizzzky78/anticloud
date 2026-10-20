@@ -169,6 +169,11 @@ export async function POST(request: NextRequest) {
         await updateSearchVector(id);
         await invalidateUserSearchCache(session.user.id);
 
+        const { queueThumbnail } = await import("@/lib/thumbnails");
+        await queueThumbnail({ id, mimeType, size: BigInt(size) }).catch((err) =>
+          console.error(`[upload] Failed to queue thumbnail for ${id}:`, err),
+        );
+
         const { recordAudit } = await import("@/lib/audit");
         await recordAudit({
           actorId: session.user.id,

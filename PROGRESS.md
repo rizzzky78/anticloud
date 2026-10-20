@@ -56,6 +56,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P17 — Personal views & browser UX
 - [x] 17.1 starred · 17.2 recent · 17.3 sorting · 17.4 folder upload · 17.5 navigation
 
+## P18 — Thumbnails
+- [x] 18.1 schema + sharp · 18.2 generation · 18.3 serving
+
 ---
 
 # UI Progress

@@ -80,6 +80,7 @@ export async function promoteDerivative(payload: unknown) {
         objectKey: derivative.objectKey,
         mimeType: derivative.mimeType,
         size: derivative.size,
+        thumbnailKey: null,
       },
     }),
     db.file.update({
@@ -93,6 +94,10 @@ export async function promoteDerivative(payload: unknown) {
     }),
   ]);
 
+  if (original.thumbnailKey) {
+    const { removeObjects } = await import("@/lib/storage");
+    await removeObjects([original.thumbnailKey]).catch(() => {});
+  }
   await bustFileMeta(originalId);
   await bustFileMeta(derivativeId);
 
