@@ -1,10 +1,13 @@
 import { Readable } from "node:stream";
 import { type NextRequest } from "next/server";
+import type { Role } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth-context";
 import { db } from "@/lib/db";
-import { putObject } from "@/lib/storage";
-import { del } from "@/lib/cache";
-import { redisKey, NS } from "@/lib/redis";
+import { buildObjectKey, putObject, removeObject } from "@/lib/storage";
+import { getCachedAccess, hasMinimumLevel } from "@/lib/permissions";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { mimeTypeSchema } from "@/lib/paths";
+import { replaceFileContent } from "@/lib/versions";
 import { toApiError, statusFor } from "@/lib/result";
 
 export const runtime = "nodejs";
@@ -14,11 +17,10 @@ const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
 /**
  * PUT /api/files/[id]/replace
  *
- * Replace the binary content of an existing file. Updates size and MIME type
- * in the DB. Rejects with 423 if the file is read-only (superadmin bypasses).
- *
- * This is the ONLY path that writes a new binary for an existing file key;
- * all other metadata operations in phase-04 never touch MinIO.
+ * Upload new content for an existing file. The new binary is written to a NEW
+ * object key; the previous binary is kept as a `FileVersion` (plan/phase-13),
+ * so a replace is always reversible. Rejects with 423 if the file is
+ * read-only (superadmin bypasses).
  *
  * Required headers:
  *   Content-Length — byte size of the replacement body
@@ -46,30 +48,25 @@ export async function PUT(
       return Response.json({ code: "NOT_FOUND", message: "Not found" }, { status: 404 });
     }
 
-    const userRole = session.user.role as string | undefined;
-    const isSuperadmin = userRole === "SUPERADMIN";
-
-    // Write access: owner, superadmin, or explicit ADMIN/SUPERADMIN grant.
-    const grant = await db.filePermission.findUnique({
-      where: { fileId_userId: { fileId: id, userId: session.user.id } },
-      select: { role: true },
-    });
-
-    const hasWrite =
-      isSuperadmin ||
-      file.ownerId === session.user.id ||
-      grant?.role === "SUPERADMIN" ||
-      grant?.role === "ADMIN";
-
-    if (!hasWrite) {
+    const userRole = session.user.role as Role;
+    const level = await getCachedAccess({ id: session.user.id, role: userRole }, id);
+    if (!level || !hasMinimumLevel(level, "ADMIN")) {
       // Return 404 to avoid confirming file existence to unauthorized callers.
       return Response.json({ code: "NOT_FOUND", message: "Not found" }, { status: 404 });
     }
 
-    if (file.isReadOnly && !isSuperadmin) {
+    if (file.isReadOnly && userRole !== "SUPERADMIN") {
       return Response.json(
         { code: "READ_ONLY", message: "This file is read-only" },
         { status: 423 },
+      );
+    }
+
+    const limit = await checkRateLimit(`upload:${session.user.id}`, 20, 60);
+    if (!limit.allowed) {
+      return Response.json(
+        { code: "RATE_LIMITED", message: "Too many uploads" },
+        { status: 429, headers: { "Retry-After": String(limit.resetIn) } },
       );
     }
 
@@ -96,23 +93,32 @@ export async function PUT(
       );
     }
 
-    const newMimeType = request.headers.get("content-type") ?? file.mimeType;
+    const mime = mimeTypeSchema.safeParse(request.headers.get("content-type") ?? file.mimeType);
+    const newMimeType = mime.success ? mime.data : file.mimeType;
+
+    const { key: newKey } = buildObjectKey();
     const nodeStream = Readable.fromWeb(
       body as Parameters<typeof Readable.fromWeb>[0],
     );
+    await putObject(newKey, nodeStream, size, { "Content-Type": newMimeType });
 
-    await putObject(file.objectKey, nodeStream, size, { "Content-Type": newMimeType });
+    let version: number;
+    try {
+      ({ version } = await replaceFileContent({
+        fileId: id,
+        newObjectKey: newKey,
+        mimeType: newMimeType,
+        size: BigInt(size),
+        actorId: session.user.id,
+      }));
+    } catch (err) {
+      // Never leave an orphaned object behind when the DB swap fails.
+      await removeObject(newKey).catch(() => {});
+      throw err;
+    }
 
-    await db.file.update({
-      where: { id },
-      data: { mimeType: newMimeType, size: BigInt(size) },
-    });
-
-    // Bust filemeta and perm caches for this file.
-    await del(
-      redisKey(NS.filemeta, id),
-      redisKey(NS.perm, session.user.id, id),
-    );
+    const { invalidateUserSearchCache } = await import("@/lib/search");
+    await invalidateUserSearchCache();
 
     const { recordAudit } = await import("@/lib/audit");
     await recordAudit({
@@ -120,11 +126,19 @@ export async function PUT(
       action: "file.replace",
       targetType: "file",
       targetId: id,
-      metadata: { mimeType: newMimeType, size: size.toString() },
+      metadata: {
+        mimeType: newMimeType,
+        size: size.toString(),
+        previousVersion: file.version,
+        version,
+      },
     });
 
-    return Response.json({ id });
+    return Response.json({ id, version });
   } catch (err) {
+    if (statusFor(err) >= 500) {
+      console.error("[replace] Unexpected error during file replace:", err);
+    }
     return Response.json(toApiError(err), { status: statusFor(err) });
   }
 }

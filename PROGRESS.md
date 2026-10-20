@@ -41,6 +41,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P12 — Reliability & maintenance
 - [x] 12.1 job queue · 12.2 maintenance · 12.3 archive serving · 12.4 input normalization · 12.5 fixes · 12.6 telemetry
 
+## P13 — File versions
+- [x] 13.1 schema · 13.2 versioned replace · 13.3 restore/delete/download · 13.4 UI
+
 ---
 
 # UI Progress

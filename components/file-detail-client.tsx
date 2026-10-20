@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatBytes, formatRelativeDate } from "@/lib/format";
-import { canManage } from "@/lib/ui-access";
+import { isAdminOrAbove } from "@/lib/ui-access";
 import { getFileIcon } from "@/components/file-list-types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +73,7 @@ import {
 } from "@/components/file-media-viewer";
 import { NoteHistoryDialog } from "@/components/note-history";
 import { FileSharingPanel } from "@/components/file-sharing-panel";
+import { FileVersionsPanel } from "@/components/file-versions-panel";
 import { softDeleteFile, recoverFile } from "@/actions/file-config";
 import { compress, promoteDerivative } from "@/actions/compress";
 import { useJobs } from "@/components/jobs-context";
@@ -144,7 +145,11 @@ export function FileDetailClient({
 
   const FileIconComponent = getFileIcon(file.mimeType);
   const isMutateDisabled = file.isReadOnly && user.role !== "SUPERADMIN";
-  const userCanManage = canManage(file, user.id, user.role);
+  // Manage rights come from the server-resolved level (owner, grant, or
+  // moderating admin); a read-only lock still blocks non-admins.
+  const userCanManage =
+    (permissionLevel === "ADMIN" || permissionLevel === "SUPERADMIN") &&
+    (!file.isReadOnly || isAdminOrAbove(user.role));
   const isSoftDeleted = !!file.deletedAt;
 
   // Check if previewable
@@ -459,6 +464,7 @@ export function FileDetailClient({
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="sharing">Sharing</TabsTrigger>
+              <TabsTrigger value="versions">Versions</TabsTrigger>
             </TabsList>
 
             {/* Overview tab */}
@@ -788,6 +794,26 @@ export function FileDetailClient({
                     onOpenVisibility={() => setIsVisibilityOpen(true)}
                     onOpenConfig={() => setIsConfigOpen(true)}
                     onSuccess={handleRefresh}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="versions" className="outline-hidden">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <History className="size-4 text-primary" /> Version History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <FileVersionsPanel
+                    fileId={file.id}
+                    currentVersion={file.version ?? 1}
+                    currentSize={file.size}
+                    currentUpdatedAt={file.contentUpdatedAt ?? file.updatedAt}
+                    canEdit={userCanManage && !isSoftDeleted}
+                    onChanged={handleRefresh}
                   />
                 </CardContent>
               </Card>

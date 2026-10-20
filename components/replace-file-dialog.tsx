@@ -103,8 +103,9 @@ export function ReplaceFileDialog({
             <div className="space-y-1">
               <p className="font-semibold">Destructive Action</p>
               <p className="text-destructive/90">
-                You are about to overwrite the content of <strong>{fileName}</strong>. 
-                Any existing downloads of this file will reflect the new content. This cannot be undone.
+                You are about to upload new content for <strong>{fileName}</strong>.
+                Links and downloads will serve the new content. The current content is
+                kept in the Versions tab and can be restored at any time.
               </p>
             </div>
           </div>

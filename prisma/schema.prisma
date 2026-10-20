@@ -85,6 +85,7 @@ model User {
   notes           FileNote[]       @relation("NoteAuthor")
   notifications   Notification[]
   auditLogs       AuditLog[]       @relation("AuditActor")
+  versionsUploaded FileVersion[]   @relation("VersionUploader")
 
   @@index([role])
   @@map("user")
@@ -161,6 +162,13 @@ model File {
   mimeType  String
   size      BigInt
 
+  // Current content version number. Incremented by every replace/restore; the
+  // previous binaries are kept as `FileVersion` rows (plan/phase-13).
+  version Int @default(1)
+  // Who uploaded the current binary and when (renames do not touch these).
+  contentUploadedById String?
+  contentUpdatedAt    DateTime @default(now())
+
   // Visibility / access configuration.
   visibility          Visibility @default(PRIVATE)
   guestAccess         Boolean    @default(false)
@@ -196,6 +204,7 @@ model File {
   mentions      FileMention[]
   notes         FileNote[]
   notifications Notification[]
+  versions      FileVersion[]
 
   @@index([ownerId])
   @@index([createdAt])
@@ -209,6 +218,31 @@ model File {
 // ─────────────────────────────────────────────────────────────────────────────
 // RBAC file-level grants. plan/phase-02-rbac.md.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Previous content of a file (plan/phase-13). The live binary is always on the
+/// `File` row; each replace/restore snapshots the outgoing binary here.
+model FileVersion {
+  id     String @id @default(cuid())
+  fileId String
+  file   File   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  version   Int
+  objectKey String @unique
+  mimeType  String
+  size      BigInt
+
+  // Who uploaded this content and when it was originally uploaded.
+  uploadedById String?
+  uploadedBy   User?   @relation("VersionUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt   DateTime
+
+  // When this content was superseded (moved into history).
+  createdAt DateTime @default(now())
+
+  @@unique([fileId, version])
+  @@index([fileId])
+  @@map("file_version")
+}
 
 model FilePermission {
   id     String @id @default(cuid())

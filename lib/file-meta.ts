@@ -17,6 +17,10 @@ export interface FileMetaRecord {
   mimeType: string;
   /** Serialised BigInt — convert back with BigInt(record.size). */
   size: string;
+  /** Current content version (incremented on replace/restore). */
+  version: number;
+  /** When the current binary was uploaded (ISO). */
+  contentUpdatedAt: string;
   visibility: Visibility;
   folderPath: string;
   guestAccess: boolean;
@@ -55,6 +59,8 @@ export async function getFileMeta(fileId: string): Promise<FileMetaRecord | null
     objectKey: file.objectKey,
     mimeType: file.mimeType,
     size: file.size.toString(),
+    version: file.version,
+    contentUpdatedAt: file.contentUpdatedAt.toISOString(),
     visibility: file.visibility,
     folderPath: file.folderPath,
     guestAccess: file.guestAccess,

@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
           data: {
             id,
             ownerId: session.user.id,
+            contentUploadedById: session.user.id,
             displayName,
             objectKey: key,
             mimeType,

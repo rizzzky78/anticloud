@@ -5,6 +5,7 @@ import { listObjects, removeObjects, KeyPrefix } from "@/lib/storage";
 import { bustFileMeta } from "@/lib/file-meta";
 import { invalidatePermCache } from "@/lib/permissions";
 import { invalidateUserSearchCache } from "@/lib/search";
+import { versionObjectKeys } from "@/lib/versions";
 
 /** Soft-deleted files stay restorable from the recycle bin for this long. */
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -15,8 +16,9 @@ const LOCK_KEY = "maintenance:lock";
 const LOCK_TTL_SECONDS = 15 * 60;
 
 /**
- * Permanently delete one file: every storage object it owns, then the row.
- * Child rows (tags, notes, mentions, grants, versions…) cascade in Postgres.
+ * Permanently delete one file: the live binary and every historical version
+ * object, then the row. Child rows (tags, notes, mentions, grants, versions…)
+ * cascade in Postgres.
  */
 export async function hardDeleteFile(fileId: string): Promise<void> {
   const file = await db.file.findUnique({
@@ -25,7 +27,8 @@ export async function hardDeleteFile(fileId: string): Promise<void> {
   });
   if (!file) return;
 
-  await removeObjects([file.objectKey]);
+  const historyKeys = await versionObjectKeys(fileId);
+  await removeObjects([file.objectKey, ...historyKeys]);
   await db.file.delete({ where: { id: fileId } });
   await bustFileMeta(fileId);
   await invalidatePermCache(null, fileId);

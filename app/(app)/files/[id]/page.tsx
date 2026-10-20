@@ -42,6 +42,8 @@ export default async function FileDetailPage({ params }: PageProps) {
         objectKey: rawFile.objectKey,
         mimeType: rawFile.mimeType,
         size: rawFile.size.toString(),
+        version: rawFile.version,
+        contentUpdatedAt: rawFile.contentUpdatedAt.toISOString(),
         visibility: rawFile.visibility,
         folderPath: rawFile.folderPath,
         guestAccess: rawFile.guestAccess,

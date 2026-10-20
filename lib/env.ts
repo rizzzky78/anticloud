@@ -57,6 +57,10 @@ const envSchema = z.object({
   // APP_URL is always trusted; list the OTHER origins here. Optional.
   TRUSTED_ORIGINS: z.string().optional(),
   CRON_SECRET: z.string().min(16, "must be at least 16 characters"),
+
+  // Previous versions kept per file when content is replaced. Oldest beyond
+  // this limit are pruned (binary + row). 0 disables version history.
+  FILE_VERSION_LIMIT: z.coerce.number().int().min(0).max(1000).default(20),
 });
 
 /** Inferred, fully-typed shape of the validated environment. */

@@ -156,6 +156,8 @@ export async function searchFiles(
     displayName: file.displayName,
     mimeType: file.mimeType,
     size: file.size.toString(),
+    version: file.version,
+    contentUpdatedAt: file.contentUpdatedAt.toISOString(),
     owner: file.owner,
     tags: file.tags.map((ft) => ft.tag.value),
     visibility: file.visibility,
