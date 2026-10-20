@@ -17,9 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import { AvatarUploader } from "@/components/avatar-uploader";
+import { AccountSecurity } from "@/components/account-security";
 import {
   Sun,
   Moon,
@@ -164,12 +165,11 @@ export default function SettingsPage() {
         <Card className="border shadow-xs lg:col-span-2 flex flex-col">
           {/* Identity banner */}
           <div className="flex items-center gap-3.5 px-6 pt-5 pb-4">
-            <Avatar className="size-12 shrink-0 text-base">
-              <AvatarImage src={user.image ?? ""} alt={user.name} />
-              <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                {getInitials(user.name)}
-              </AvatarFallback>
-            </Avatar>
+            <AvatarUploader
+              image={user.image}
+              name={user.name}
+              initials={getInitials(user.name)}
+            />
             <div className="flex-1 min-w-0 space-y-1">
               <p className="font-semibold text-lg text-foreground leading-tight truncate">
                 {user.name}
@@ -401,6 +401,12 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      {/* Security: password, two-factor, sessions */}
+      <AccountSecurity
+        twoFactorEnabled={!!(user as { twoFactorEnabled?: boolean | null }).twoFactorEnabled}
+        currentSessionToken={session?.session?.token ?? null}
+      />
     </div>
   );
 }

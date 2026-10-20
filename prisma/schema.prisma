@@ -75,6 +75,13 @@ model User {
   // RBAC system role (plan/phase-02). File-level grants live in FilePermission.
   role Role @default(VIEWER)
 
+  // Two-factor authentication (Better-Auth twoFactor plugin, plan/phase-19).
+  twoFactorEnabled Boolean? @default(false)
+  twoFactors       TwoFactor[]
+
+  // Storage key of the uploaded avatar; `image` holds its public URL.
+  avatarKey String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -136,6 +143,21 @@ model Account {
 
   @@index([userId])
   @@map("account")
+}
+
+/// TOTP secret and backup codes (Better-Auth twoFactor plugin). Secrets are
+/// managed by Better-Auth only; never read them from application code.
+model TwoFactor {
+  id          String  @id @default(cuid())
+  secret      String
+  backupCodes String
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified    Boolean @default(true)
+
+  @@index([secret])
+  @@index([userId])
+  @@map("two_factor")
 }
 
 model Verification {

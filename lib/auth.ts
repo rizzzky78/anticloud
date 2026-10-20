@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { username } from "better-auth/plugins";
+import { twoFactor, username } from "better-auth/plugins";
 import { db } from "./db";
 import { env } from "./env";
 import { redis, redisKey, NS } from "./redis";
@@ -12,8 +12,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  appName: "Anticloud",
   plugins: [
-    username()
+    username(),
+    // TOTP two-factor authentication with backup codes (plan/phase-19).
+    twoFactor({ issuer: "Anticloud" }),
   ],
   secondaryStorage: {
     get: async (key) => {

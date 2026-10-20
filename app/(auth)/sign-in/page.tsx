@@ -58,8 +58,14 @@ export default function SignInPage() {
       ? signIn.email({ email: credential, password })
       : signIn.username({ username: credential, password });
 
-    const { error } = await authCall;
+    const { data, error } = await authCall;
     setLoading(false);
+
+    // Accounts with 2FA get a pending session; finish on the verification page.
+    if (!error && data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+      router.push("/two-factor");
+      return;
+    }
 
     if (error) {
       if (error.status === 429) {

@@ -52,6 +52,7 @@ export const KeyPrefix = {
   derived: "derived",
   archive: "archives",
   thumbnail: "thumbs",
+  avatar: "avatars",
 } as const;
 
 export type KeyPrefix = (typeof KeyPrefix)[keyof typeof KeyPrefix];

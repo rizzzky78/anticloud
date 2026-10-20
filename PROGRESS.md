@@ -59,6 +59,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P18 — Thumbnails
 - [x] 18.1 schema + sharp · 18.2 generation · 18.3 serving
 
+## P19 — Account security
+- [x] 19.1 two-factor · 19.2 password change · 19.3 sessions · 19.4 profile picture
+
 ---
 
 # UI Progress

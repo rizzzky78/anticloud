@@ -21,7 +21,7 @@ export async function proxy(request: NextRequest) {
   const isNextAsset = pathname.startsWith('/_next') || pathname.startsWith('/static') || pathname.includes('.');
   const isMetrics = pathname === '/api/metrics';
   const isApiAuth = pathname.startsWith('/api/auth');
-  const isAuthPage = pathname === '/sign-in' || pathname === '/sign-up';
+  const isAuthPage = pathname === '/sign-in' || pathname === '/sign-up' || pathname === '/two-factor';
   // Public share-link landing pages need no session.
   const isPublicPage = pathname.startsWith('/s/');
   const isApi = pathname.startsWith('/api/');
