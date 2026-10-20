@@ -7,6 +7,7 @@ import { z } from "zod";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
+import { refreshUserSessions } from "@/lib/auth-admin";
 
 const setSystemRoleSchema = z.object({
   userId: z.string(),
@@ -37,7 +38,9 @@ export async function setSystemRole(payload: unknown) {
   });
 
   await invalidatePermCache(userId, null);
-  
+  // Sessions cache the user record; re-snapshot so the new role applies now.
+  await refreshUserSessions(userId);
+
   await recordAudit({
     action: "role.set_system",
     targetType: "user",

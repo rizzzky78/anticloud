@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { buildObjectKey, KeyPrefix, putObject, removeObjects } from "@/lib/storage";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { recordAudit } from "@/lib/audit";
+import { refreshUserSessions } from "@/lib/auth-admin";
 import { toApiError, statusFor } from "@/lib/result";
 
 export const runtime = "nodejs";
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       data: { avatarKey: key, image },
     });
     if (previous?.avatarKey) await removeObjects([previous.avatarKey]).catch(() => {});
+    await refreshUserSessions(session.user.id);
 
     await recordAudit({ actorId: session.user.id, action: "account.avatar_update", targetType: "user", targetId: session.user.id });
     return Response.json({ image });
@@ -87,6 +89,7 @@ export async function DELETE() {
       data: { avatarKey: null, image: null },
     });
     if (user?.avatarKey) await removeObjects([user.avatarKey]).catch(() => {});
+    await refreshUserSessions(session.user.id);
 
     await recordAudit({ actorId: session.user.id, action: "account.avatar_remove", targetType: "user", targetId: session.user.id });
     return new Response(null, { status: 204 });

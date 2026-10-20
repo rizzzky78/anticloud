@@ -61,15 +61,20 @@ export async function getUsers() {
         role: true,
         createdAt: true,
         storageQuota: true,
+        disabledAt: true,
+        disabledReason: true,
+        twoFactorEnabled: true,
       },
     }),
     usageByOwner(),
   ]);
 
-  return users.map(({ storageQuota, ...u }) => {
+  return users.map(({ storageQuota, disabledAt, twoFactorEnabled, ...u }) => {
     const quota = effectiveQuota({ role: u.role, storageQuota });
     return {
       ...u,
+      disabledAt: disabledAt?.toISOString() ?? null,
+      twoFactorEnabled: !!twoFactorEnabled,
       storageUsed: (usage.get(u.id) ?? BigInt(0)).toString(),
       // Raw setting: null = deployment default, "0" = unlimited.
       storageQuotaSetting: storageQuota === null ? null : storageQuota.toString(),

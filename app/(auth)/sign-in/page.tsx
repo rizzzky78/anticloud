@@ -70,6 +70,8 @@ export default function SignInPage() {
     if (error) {
       if (error.status === 429) {
         setIsRateLimited(true);
+      } else if (error.status === 403 && error.message) {
+        toast.error(error.message);
       } else {
         toast.error("Sign in failed. Please check your credentials.");
       }

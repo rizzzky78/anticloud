@@ -65,6 +65,9 @@ const envSchema = z.object({
   // Default per-user storage quota in MiB when a user has no explicit quota.
   // 0 (default) = unlimited.
   DEFAULT_STORAGE_QUOTA_MB: z.coerce.number().int().min(0).default(0),
+
+  // Public self-registration. Set false to let only admins create accounts.
+  ALLOW_SIGNUP: z.stringbool().default(true),
 });
 
 /** Inferred, fully-typed shape of the validated environment. */

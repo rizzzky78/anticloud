@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { twoFactor, username } from "better-auth/plugins";
 import { db } from "./db";
@@ -11,6 +12,10 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // Admins can turn off self-registration (accounts then come from the
+    // Users console, plan/phase-22).
+    disableSignUp: !env.ALLOW_SIGNUP,
+    minPasswordLength: 8,
   },
   appName: "Anticloud",
   plugins: [
@@ -56,8 +61,31 @@ export const auth = betterAuth({
       maxAge: 5 * 60, // 5 minutes
     }
   },
+  databaseHooks: {
+    session: {
+      create: {
+        // Disabled accounts cannot open new sessions (plan/phase-22).
+        before: async (session) => {
+          const user = await db.user.findUnique({
+            where: { id: session.userId },
+            select: { disabledAt: true },
+          });
+          if (user?.disabledAt) {
+            throw new APIError("FORBIDDEN", {
+              message: "This account has been disabled. Contact an administrator.",
+            });
+          }
+        },
+      },
+    },
+  },
   user: {
     additionalFields: {
+      disabledAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
       role: {
         type: "string",
         required: false,

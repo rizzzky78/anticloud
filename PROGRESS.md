@@ -68,6 +68,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P21 — Notifications v2
 - [x] 21.1 notify helper · 21.2 real-time stream · 21.3 new events
 
+## P22 — Admin user lifecycle
+- [x] 22.1 disabled accounts · 22.2 session cache · 22.3 lifecycle actions · 22.4 UI
+
 ---
 
 # UI Progress

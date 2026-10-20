@@ -9,8 +9,14 @@ import { headers } from "next/headers";
  * immediately). Session lookups still hit Redis secondary storage, not Postgres.
  */
 export async function getCurrentUser() {
-  return await auth.api.getSession({
+  const session = await auth.api.getSession({
     headers: await headers(),
     query: { disableCookieCache: true },
   });
+  // Belt and braces: disabling revokes sessions, but never honor a session
+  // whose cached user record says the account is disabled.
+  if (session?.user && (session.user as { disabledAt?: Date | string | null }).disabledAt) {
+    return null;
+  }
+  return session;
 }

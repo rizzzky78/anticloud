@@ -86,6 +86,11 @@ model User {
   // default (`DEFAULT_STORAGE_QUOTA_MB`); 0 = unlimited.
   storageQuota BigInt?
 
+  // Account lifecycle (plan/phase-22). A disabled user cannot sign in and
+  // has every session revoked.
+  disabledAt     DateTime?
+  disabledReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { setUserQuota } from "@/actions/users";
+import { AdminUserActions } from "@/components/admin-user-actions";
+import { AdminCreateUserDialog } from "@/components/admin-create-user-dialog";
 import { formatBytes } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,6 +70,9 @@ interface UserItem {
   storageUsed: string;
   storageQuotaSetting: string | null;
   storageQuotaEffective: string | null;
+  disabledAt: string | null;
+  disabledReason: string | null;
+  twoFactorEnabled: boolean;
 }
 
 type QuotaMode = "default" | "unlimited" | "custom";
@@ -87,6 +92,10 @@ export function UsersTableClient({
 }: UsersTableClientProps) {
   const router = useRouter();
   const [users, setUsers] = useState<UserItem[]>(initialUsers);
+  // Server refreshes (after create/disable/delete) deliver new props.
+  useEffect(() => {
+    setUsers(initialUsers);
+  }, [initialUsers]);
   const [quotaUser, setQuotaUser] = useState<UserItem | null>(null);
   const [quotaMode, setQuotaMode] = useState<QuotaMode>("default");
   const [quotaMb, setQuotaMb] = useState("");
@@ -255,14 +264,17 @@ export function UsersTableClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center relative max-w-sm">
-        <Search className="absolute left-3 size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search users by name, email or username..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9 border-0"
-        />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center relative w-full max-w-sm">
+          <Search className="absolute left-3 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search users by name, email or username..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 border-0"
+          />
+        </div>
+        <AdminCreateUserDialog canCreateSuperadmin={currentUserRole === "SUPERADMIN"} />
       </div>
 
       <Card className="border border-border/80 shadow-md">
@@ -275,7 +287,7 @@ export function UsersTableClient({
                 <TableHead>Current Role</TableHead>
                 <TableHead>Storage</TableHead>
                 <TableHead>Registered</TableHead>
-                <TableHead className="text-right w-[180px]">Actions</TableHead>
+                <TableHead className="text-right w-[220px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -324,6 +336,24 @@ export function UsersTableClient({
                             <span className="text-xs text-muted-foreground truncate">
                               {user.email}
                             </span>
+                            {(user.disabledAt || user.twoFactorEnabled) && (
+                              <span className="flex flex-wrap gap-1 pt-0.5">
+                                {user.disabledAt && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="px-1 py-0 text-[9px]"
+                                    title={user.disabledReason ?? undefined}
+                                  >
+                                    Disabled
+                                  </Badge>
+                                )}
+                                {user.twoFactorEnabled && (
+                                  <Badge variant="outline" className="px-1 py-0 text-[9px]">
+                                    2FA
+                                  </Badge>
+                                )}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -402,6 +432,16 @@ export function UsersTableClient({
                             {isCurrent
                               ? "Cannot change self"
                               : "Insufficient access"}
+                          </span>
+                        )}
+                        {editable && (
+                          <span className="inline-flex align-middle ml-1">
+                            <AdminUserActions
+                              user={user}
+                              transferCandidates={users
+                                .filter((u) => u.id !== user.id && !u.disabledAt)
+                                .map((u) => ({ id: u.id, name: u.name, email: u.email }))}
+                            />
                           </span>
                         )}
                       </TableCell>

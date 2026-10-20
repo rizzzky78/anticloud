@@ -94,7 +94,8 @@ export default function SignUpPage() {
       if (error.status === 429) {
         setIsRateLimited(true);
       } else {
-        toast.error("Sign up failed. Please try again.");
+        // Surface server reasons such as "sign up is disabled" or a taken email.
+        toast.error(error.message || "Sign up failed. Please try again.");
       }
     } else {
       router.push("/files");

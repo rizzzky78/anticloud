@@ -15,10 +15,10 @@ export default async function AdminUsersPage() {
       <div className="flex-1 space-y-6 w-full mx-auto">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <UsersIcon className="size-6 text-primary" /> User Role Management
+            <UsersIcon className="size-6 text-primary" /> Users &amp; Accounts
           </h1>
           <p className="text-muted-foreground text-sm">
-            View all registered users and manage their system access roles.
+            Create accounts, manage roles and storage, and disable or remove users.
           </p>
         </div>
 
