@@ -62,6 +62,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P19 — Account security
 - [x] 19.1 two-factor · 19.2 password change · 19.3 sessions · 19.4 profile picture
 
+## P20 — Storage quota & usage
+- [x] 20.1 quota model · 20.2 admin quota · 20.3 storage page
+
 ---
 
 # UI Progress

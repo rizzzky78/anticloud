@@ -9,7 +9,20 @@ import {
   User,
   ShieldCheck,
   Loader2,
+  HardDrive,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { setUserQuota } from "@/actions/users";
+import { formatBytes } from "@/lib/format";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -52,7 +65,14 @@ interface UserItem {
   username: string | null;
   role: Role;
   createdAt: Date | string;
+  storageUsed: string;
+  storageQuotaSetting: string | null;
+  storageQuotaEffective: string | null;
 }
+
+type QuotaMode = "default" | "unlimited" | "custom";
+
+const MIB = 1024 * 1024;
 
 interface UsersTableClientProps {
   initialUsers: UserItem[];
@@ -67,6 +87,47 @@ export function UsersTableClient({
 }: UsersTableClientProps) {
   const router = useRouter();
   const [users, setUsers] = useState<UserItem[]>(initialUsers);
+  const [quotaUser, setQuotaUser] = useState<UserItem | null>(null);
+  const [quotaMode, setQuotaMode] = useState<QuotaMode>("default");
+  const [quotaMb, setQuotaMb] = useState("");
+  const [savingQuota, setSavingQuota] = useState(false);
+
+  const openQuota = (user: UserItem) => {
+    setQuotaUser(user);
+    if (user.storageQuotaSetting === null) {
+      setQuotaMode("default");
+      setQuotaMb("");
+    } else if (user.storageQuotaSetting === "0") {
+      setQuotaMode("unlimited");
+      setQuotaMb("");
+    } else {
+      setQuotaMode("custom");
+      setQuotaMb(String(Math.round(Number(user.storageQuotaSetting) / MIB)));
+    }
+  };
+
+  const saveQuota = async () => {
+    if (!quotaUser) return;
+    const mb = quotaMode === "custom" ? Number(quotaMb) : null;
+    if (quotaMode === "custom" && (!Number.isInteger(mb) || (mb as number) < 1)) {
+      toast.error("Enter a quota of at least 1 MB");
+      return;
+    }
+    setSavingQuota(true);
+    try {
+      await setUserQuota({
+        userId: quotaUser.id,
+        quotaMb: quotaMode === "default" ? null : quotaMode === "unlimited" ? 0 : mb,
+      });
+      toast.success(`Quota updated for ${quotaUser.name}`);
+      setQuotaUser(null);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update quota");
+    } finally {
+      setSavingQuota(false);
+    }
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -212,6 +273,7 @@ export function UsersTableClient({
                 <TableHead className="w-[250px]">User</TableHead>
                 <TableHead>Username</TableHead>
                 <TableHead>Current Role</TableHead>
+                <TableHead>Storage</TableHead>
                 <TableHead>Registered</TableHead>
                 <TableHead className="text-right w-[180px]">Actions</TableHead>
               </TableRow>
@@ -220,7 +282,7 @@ export function UsersTableClient({
               {filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="h-32 text-center text-muted-foreground"
                   >
                     No users found matching your search.
@@ -269,6 +331,30 @@ export function UsersTableClient({
                         {user.username ? `@${user.username}` : "—"}
                       </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex items-center gap-1.5">
+                          <span className="whitespace-nowrap">
+                            {formatBytes(user.storageUsed)}
+                            <span className="text-muted-foreground">
+                              {" / "}
+                              {user.storageQuotaEffective === null
+                                ? "∞"
+                                : formatBytes(user.storageQuotaEffective)}
+                            </span>
+                          </span>
+                          {(currentUserRole === "SUPERADMIN" || user.role !== "SUPERADMIN") && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              title="Set storage quota"
+                              onClick={() => openQuota(user)}
+                            >
+                              <HardDrive className="size-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {formatDate(user.createdAt.toString())}
                       </TableCell>
@@ -361,6 +447,50 @@ export function UsersTableClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!quotaUser} onOpenChange={(open) => !open && setQuotaUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Storage quota</DialogTitle>
+            <DialogDescription>
+              {quotaUser?.name} uses {quotaUser ? formatBytes(quotaUser.storageUsed) : ""} (files,
+              recycle bin and version history).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Select value={quotaMode} onValueChange={(v) => setQuotaMode(v as QuotaMode)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Deployment default</SelectItem>
+                <SelectItem value="unlimited">Unlimited</SelectItem>
+                <SelectItem value="custom">Custom limit</SelectItem>
+              </SelectContent>
+            </Select>
+            {quotaMode === "custom" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="quota-mb" className="text-xs">Limit (MB)</Label>
+                <Input
+                  id="quota-mb"
+                  type="number"
+                  min={1}
+                  value={quotaMb}
+                  onChange={(e) => setQuotaMb(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuotaUser(null)} disabled={savingQuota}>
+              Cancel
+            </Button>
+            <Button onClick={saveQuota} disabled={savingQuota}>
+              {savingQuota ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

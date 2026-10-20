@@ -82,6 +82,10 @@ model User {
   // Storage key of the uploaded avatar; `image` holds its public URL.
   avatarKey String?
 
+  // Per-user storage quota in bytes (plan/phase-20). Null = deployment
+  // default (`DEFAULT_STORAGE_QUOTA_MB`); 0 = unlimited.
+  storageQuota BigInt?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

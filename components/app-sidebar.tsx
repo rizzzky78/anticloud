@@ -36,6 +36,7 @@ import {
   UsersRoundIcon,
   StarIcon,
   ClockIcon,
+  HardDriveIcon,
 } from "lucide-react";
 
 interface AppSidebarUser {
@@ -82,6 +83,7 @@ export function AppSidebar({
     { title: "Search", url: "/search", icon: <SearchIcon /> },
     { title: "Notifications", url: "/notifications", icon: <BellIcon /> },
     { title: "Recycle Bin", url: "/trash", icon: <Trash2Icon /> },
+    { title: "Storage", url: "/storage", icon: <HardDriveIcon /> },
   ];
 
   return (

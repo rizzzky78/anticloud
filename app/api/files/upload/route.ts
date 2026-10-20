@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { toApiError, statusFor } from "@/lib/result";
 import { displayNameSchema, folderPathSchema, mimeTypeSchema } from "@/lib/paths";
 import { assertCanUpload } from "@/lib/folders";
+import { assertWithinQuota } from "@/lib/quota";
 import type { Role } from "@prisma/client";
 
 export const runtime = "nodejs";
@@ -123,6 +124,9 @@ export async function POST(request: NextRequest) {
 
     const { key, id } = buildObjectKey();
     const { displayName, mimeType, folderPath, visibility, expiresAt } = parsed.data;
+
+    // Reject before streaming anything when the uploader is out of space.
+    await assertWithinQuota(session.user.id, BigInt(size));
 
     // Folders owned by someone else only accept uploads from editors+.
     await assertCanUpload(

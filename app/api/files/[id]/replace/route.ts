@@ -8,6 +8,7 @@ import { getCachedAccess, hasMinimumLevel } from "@/lib/permissions";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { mimeTypeSchema } from "@/lib/paths";
 import { replaceFileContent } from "@/lib/versions";
+import { assertWithinQuota } from "@/lib/quota";
 import { toApiError, statusFor } from "@/lib/result";
 
 export const runtime = "nodejs";
@@ -93,6 +94,10 @@ export async function PUT(
         { status: 400 },
       );
     }
+
+    // The previous content stays in history, so the full new size counts
+    // against the file owner's quota.
+    await assertWithinQuota(file.ownerId, BigInt(size));
 
     const mime = mimeTypeSchema.safeParse(request.headers.get("content-type") ?? file.mimeType);
     const newMimeType = mime.success ? mime.data : file.mimeType;

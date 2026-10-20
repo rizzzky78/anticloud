@@ -185,8 +185,6 @@ roles.
 | Audit Logs (admin)    | `/admin/audit`          | Append-only security audit trail (superadmin-only)             | [README](<app/(app)/admin/audit/README.md>)                     |
 | Background Jobs (admin) | `/admin/jobs`         | Queue health, job status, dead-letter queue (superadmin-only)  | [README](<app/(app)/admin/jobs/README.md>)                      |
 | Recycle Bin (admin)   | `/admin/recycle-bin`    | System-wide soft-deleted file recovery (superadmin-only)        | [README](<app/(app)/admin/recycle-bin/README.md>)               |
-| Dashboard *(unused)*  | `/dashboard`            | Leftover shadcn demo scaffold, not linked in navigation        | [README](app/dashboard/README.md)                               |
-| Dashboard Search *(unused)* | `/dashboard/search` | Same Search component, reused under the unused scaffold        | [README](app/dashboard/search/README.md)                        |
 
 ---
 

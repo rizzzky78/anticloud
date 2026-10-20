@@ -61,6 +61,10 @@ const envSchema = z.object({
   // Previous versions kept per file when content is replaced. Oldest beyond
   // this limit are pruned (binary + row). 0 disables version history.
   FILE_VERSION_LIMIT: z.coerce.number().int().min(0).max(1000).default(20),
+
+  // Default per-user storage quota in MiB when a user has no explicit quota.
+  // 0 (default) = unlimited.
+  DEFAULT_STORAGE_QUOTA_MB: z.coerce.number().int().min(0).default(0),
 });
 
 /** Inferred, fully-typed shape of the validated environment. */
