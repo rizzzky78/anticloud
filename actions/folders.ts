@@ -10,6 +10,7 @@ import { redisKey, NS } from "@/lib/redis";
 import { invalidatePermCache } from "@/lib/permissions";
 import { invalidateUserSearchCache } from "@/lib/search";
 import { recordAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 import { folderPathSchema, sanitizeDisplayName } from "@/lib/paths";
 import {
   assertCanUpload,
@@ -360,17 +361,12 @@ export async function shareFolder(payload: unknown) {
   await invalidatePermCache(null, null);
   await invalidateUserSearchCache();
 
-  if (recipients.length > 0) {
-    await db.notification.createMany({
-      data: recipients.map((userId) => ({
-        userId,
-        type: "SHARE",
-        message: `${session.user.name} shared the folder "${folder.name}" with ${
-          input.targetType === "group" ? targetName : "you"
-        } as ${SHARE_LABEL[input.role]}.`,
-      })),
-    });
-  }
+  await notify(recipients, {
+    type: "SHARE",
+    message: `${session.user.name} shared the folder "${folder.name}" with ${
+      input.targetType === "group" ? targetName : "you"
+    } as ${SHARE_LABEL[input.role]}.`,
+  });
 
   await recordAudit({
     actorId: session.user.id,

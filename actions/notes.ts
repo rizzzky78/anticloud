@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { getCachedAccess, requireAccess, requireContributor } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { notifyFileOwner } from "@/lib/notify";
 
 // ─── Redis key ────────────────────────────────────────────────────────────────
 // `note:<fileId>` → JSON-serialised current note (body + version + authorId).
@@ -189,6 +190,10 @@ export async function saveNote(
   
   const fileForOwner = await db.file.findUnique({ where: { id: fileId }, select: { ownerId: true }});
   if (fileForOwner?.ownerId) await invalidateUserSearchCache(fileForOwner.ownerId);
+
+  await notifyFileOwner(fileId, session.user, "NOTE", (name) =>
+    `${session.user.name} edited the note on "${name}".`,
+  ).catch(() => {});
 
   await recordAudit({
     actorId: session.user.id,

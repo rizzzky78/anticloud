@@ -8,6 +8,7 @@ import { AppError } from "@/lib/result";
 import { requireAccess } from "@/lib/permissions";
 import { assertEditAccess, assertNotReadOnly, assertWriteAccess } from "@/lib/file-access";
 import { recordAudit } from "@/lib/audit";
+import { notifyFileOwner } from "@/lib/notify";
 import { invalidateUserSearchCache } from "@/lib/search";
 import {
   deleteFileVersion,
@@ -57,6 +58,9 @@ export async function restoreVersion(payload: unknown) {
 
   const result = await restoreFileVersion(versionId, session.user.id);
   await invalidateUserSearchCache();
+  await notifyFileOwner(version.fileId, session.user, "FILE_UPDATE", (name) =>
+    `${session.user.name} restored version ${version.version} of "${name}".`,
+  ).catch(() => {});
   await recordAudit({
     actorId: session.user.id,
     action: "file.version_restore",

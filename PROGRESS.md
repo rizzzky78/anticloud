@@ -65,6 +65,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done. Tick steps as you finish 
 ## P20 — Storage quota & usage
 - [x] 20.1 quota model · 20.2 admin quota · 20.3 storage page
 
+## P21 — Notifications v2
+- [x] 21.1 notify helper · 21.2 real-time stream · 21.3 new events
+
 ---
 
 # UI Progress

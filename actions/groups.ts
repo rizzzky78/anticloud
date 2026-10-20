@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 import { invalidateUserSearchCache } from "@/lib/search";
 
 type SessionUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>["user"];
@@ -239,12 +240,9 @@ export async function addGroupMember(payload: unknown) {
   await db.groupMember.create({ data: { groupId, userId } });
   await onMembershipChanged(userId);
   if (userId !== session.user.id) {
-    await db.notification.create({
-      data: {
-        userId,
-        type: "GROUP",
-        message: `${session.user.name} added you to the group "${group.name}".`,
-      },
+    await notify([userId], {
+      type: "GROUP",
+      message: `${session.user.name} added you to the group "${group.name}".`,
     });
   }
   await recordAudit({
@@ -393,16 +391,11 @@ export async function grantGroupRole(payload: unknown) {
     const recipients = group.members
       .map((m) => m.userId)
       .filter((id) => id !== session.user.id && id !== file.ownerId);
-    if (recipients.length > 0) {
-      await db.notification.createMany({
-        data: recipients.map((userId) => ({
-          userId,
-          fileId,
-          type: "SHARE",
-          message: `${session.user.name} shared "${file.displayName}" with ${group.name} as ${SHARE_LABEL[role]}.`,
-        })),
-      });
-    }
+    await notify(recipients, {
+      type: "SHARE",
+      fileId,
+      message: `${session.user.name} shared "${file.displayName}" with ${group.name} as ${SHARE_LABEL[role]}.`,
+    });
   }
 
   await recordAudit({

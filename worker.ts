@@ -112,6 +112,12 @@ async function main() {
         // Wait for upload to complete
         await uploadPromise;
 
+        const { notify } = await import("./lib/notify");
+        await notify([userId], {
+          type: "JOB",
+          message: `Your ZIP archive of ${permittedIds.size} file(s) is ready to download from the jobs panel.`,
+        }).catch(() => {});
+
         // The archive is streamed back through the app (auth-checked) rather
         // than a presigned storage URL: the storage endpoint is usually an
         // internal host the browser cannot reach.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition, useCallback } from "react";
+import { useState, useEffect, useTransition, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { BellIcon, CheckIcon, Loader2, Sparkles } from "lucide-react";
@@ -63,32 +63,54 @@ export function NotificationsPopover() {
     }
   }, []);
 
-  // Sync data on mount and focus
+  // Keep the latest open state for the long-lived stream handlers.
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  // Live updates over Server-Sent Events, with a slow poll as a safety net
+  // (and as the only mechanism where EventSource is unavailable).
   useEffect(() => {
     loadUnreadCount();
 
-    // Poll count every 15 seconds
+    let source: EventSource | null = null;
+    if (typeof EventSource !== "undefined") {
+      source = new EventSource("/api/notifications/stream");
+      // (Re)connected: re-sync anything missed while disconnected.
+      source.addEventListener("ready", () => {
+        loadUnreadCount();
+        if (isOpenRef.current) loadNotifications();
+      });
+      source.addEventListener("notification", (event) => {
+        setUnreadCount((prev) => prev + 1);
+        if (isOpenRef.current) loadNotifications();
+        try {
+          const data = JSON.parse((event as MessageEvent).data) as { message?: string };
+          if (data.message) toast.info(data.message);
+        } catch {
+          // Ignore malformed payloads; the count is already updated.
+        }
+      });
+    }
+
     const interval = setInterval(() => {
       loadUnreadCount();
-      if (isOpen) {
-        loadNotifications();
-      }
-    }, 15000);
+      if (isOpenRef.current) loadNotifications();
+    }, source ? 120000 : 15000);
 
-    // Refresh on focus
     const onFocus = () => {
       loadUnreadCount();
-      if (isOpen) {
-        loadNotifications();
-      }
+      if (isOpenRef.current) loadNotifications();
     };
     window.addEventListener("focus", onFocus);
 
     return () => {
+      source?.close();
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
     };
-  }, [isOpen, loadUnreadCount, loadNotifications]);
+  }, [loadUnreadCount, loadNotifications]);
 
   // Reload when pathname changes (navigation)
   useEffect(() => {

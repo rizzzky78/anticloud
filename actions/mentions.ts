@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth-context";
 import { AppError } from "@/lib/result";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -53,34 +54,30 @@ export async function addMention(payload: z.infer<typeof addMentionSchema>) {
   });
   if (!mentioned) throw AppError.notFound("Mentioned user not found");
 
-  // Upsert the mention + create a notification atomically.
-  await db.$transaction(async (tx) => {
-    // Upsert: if already mentioned this is a no-op on the mention row,
-    // but we still create the notification so the user is re-notified.
-    await tx.fileMention.upsert({
-      where: {
-        fileId_mentionedUserId: { fileId, mentionedUserId },
-      },
-      create: {
-        fileId,
-        mentionedUserId,
-        addedById: session.user.id,
-      },
-      update: {
-        // Refresh the author if re-mentioned by someone else.
-        addedById: session.user.id,
-      },
-    });
-
-    await tx.notification.create({
-      data: {
-        userId: mentionedUserId,
-        fileId,
-        type: "MENTION",
-        message: `You were mentioned in "${file.displayName}".`,
-      },
-    });
+  // Upsert: if already mentioned this is a no-op on the mention row, but the
+  // user is still re-notified.
+  await db.fileMention.upsert({
+    where: {
+      fileId_mentionedUserId: { fileId, mentionedUserId },
+    },
+    create: {
+      fileId,
+      mentionedUserId,
+      addedById: session.user.id,
+    },
+    update: {
+      // Refresh the author if re-mentioned by someone else.
+      addedById: session.user.id,
+    },
   });
+
+  if (mentionedUserId !== session.user.id) {
+    await notify([mentionedUserId], {
+      type: "MENTION",
+      fileId,
+      message: `${session.user.name} mentioned you in "${file.displayName}".`,
+    });
+  }
 
   // If the file is mention-restricted, the mention is now the access grant.
   // Bust the perm cache so the next permission check re-resolves from DB.

@@ -140,6 +140,11 @@ export async function PUT(
       },
     });
 
+    const { notifyFileOwner } = await import("@/lib/notify");
+    await notifyFileOwner(id, session.user, "FILE_UPDATE", (name) =>
+      `${session.user.name} uploaded a new version (v${version}) of "${name}".`,
+    ).catch(() => {});
+
     return Response.json({ id, version });
   } catch (err) {
     if (statusFor(err) >= 500) {

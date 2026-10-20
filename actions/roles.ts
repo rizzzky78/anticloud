@@ -6,6 +6,7 @@ import { AppError } from "@/lib/result";
 import { z } from "zod";
 import { invalidatePermCache, requireAccess } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
+import { notify } from "@/lib/notify";
 
 const setSystemRoleSchema = z.object({
   userId: z.string(),
@@ -108,15 +109,12 @@ export async function grantFileRole(payload: z.input<typeof grantFileRoleSchema>
 
   // Tell the recipient — on a new share, or when their level changes.
   if (!existing || existing.role !== role) {
-    await db.notification.create({
-      data: {
-        userId: targetUserId,
-        fileId,
-        type: "SHARE",
-        message: `${session.user.name} shared "${file.displayName}" with you as ${SHARE_LABEL[role]}${
-          expiry ? ` until ${expiry.toISOString().slice(0, 10)}` : ""
-        }.`,
-      },
+    await notify([targetUserId], {
+      type: "SHARE",
+      fileId,
+      message: `${session.user.name} shared "${file.displayName}" with you as ${SHARE_LABEL[role]}${
+        expiry ? ` until ${expiry.toISOString().slice(0, 10)}` : ""
+      }.`,
     });
   }
 
